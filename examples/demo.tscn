@@ -1,0 +1,186 @@
+[gd_scene load_steps=2 format=3 uid="uid://b8yandexgamesdemo"]
+
+[ext_resource type="Script" path="res://examples/demo.gd" id="1_demo"]
+
+[node name="Demo" type="Control"]
+layout_mode = 3
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+script = ExtResource("1_demo")
+
+[node name="Background" type="ColorRect" parent="."]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+color = Color(0.117647, 0.12549, 0.156863, 1)
+
+[node name="VBoxContainer" type="VBoxContainer" parent="."]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_left = 20.0
+offset_top = 20.0
+offset_right = -20.0
+offset_bottom = -20.0
+grow_horizontal = 2
+grow_vertical = 2
+theme_override_constants/separation = 12
+
+[node name="TopBar" type="HBoxContainer" parent="VBoxContainer"]
+layout_mode = 2
+
+[node name="Title" type="Label" parent="VBoxContainer/TopBar"]
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_font_sizes/font_size = 20
+text = "Yandex Games SDK 4.x for Godot"
+
+[node name="PlayerInfoLabel" type="Label" parent="VBoxContainer/TopBar"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.364706, 0.827451, 0.443137, 1)
+theme_override_font_sizes/font_size = 16
+text = "Player: Initializing..."
+
+[node name="GridContainer" type="GridContainer" parent="VBoxContainer"]
+layout_mode = 2
+theme_override_constants/h_separation = 10
+theme_override_constants/v_separation = 8
+columns = 4
+
+[node name="BtnInterstitial" type="Button" parent="VBoxContainer/GridContainer"]
+custom_minimum_size = Vector2(0, 36)
+layout_mode = 2
+size_flags_horizontal = 3
+text = "Show Interstitial"
+
+[node name="BtnRewarded" type="Button" parent="VBoxContainer/GridContainer"]
+custom_minimum_size = Vector2(0, 36)
+layout_mode = 2
+size_flags_horizontal = 3
+text = "Show Rewarded (+50)"
+
+[node name="BtnBannerShow" type="Button" parent="VBoxContainer/GridContainer"]
+custom_minimum_size = Vector2(0, 36)
+layout_mode = 2
+size_flags_horizontal = 3
+text = "Show Banner"
+
+[node name="BtnBannerHide" type="Button" parent="VBoxContainer/GridContainer"]
+custom_minimum_size = Vector2(0, 36)
+layout_mode = 2
+size_flags_horizontal = 3
+text = "Hide Banner"
+
+[node name="BtnAuthDialog" type="Button" parent="VBoxContainer/GridContainer"]
+custom_minimum_size = Vector2(0, 36)
+layout_mode = 2
+size_flags_horizontal = 3
+text = "Open Auth Dialog"
+
+[node name="BtnSaveCloud" type="Button" parent="VBoxContainer/GridContainer"]
+custom_minimum_size = Vector2(0, 36)
+layout_mode = 2
+size_flags_horizontal = 3
+text = "Save Cloud Data"
+
+[node name="BtnLoadCloud" type="Button" parent="VBoxContainer/GridContainer"]
+custom_minimum_size = Vector2(0, 36)
+layout_mode = 2
+size_flags_horizontal = 3
+text = "Load Cloud Data"
+
+[node name="BtnIncStats" type="Button" parent="VBoxContainer/GridContainer"]
+custom_minimum_size = Vector2(0, 36)
+layout_mode = 2
+size_flags_horizontal = 3
+text = "Level Up (Inc Stats)"
+
+[node name="BtnSetScore" type="Button" parent="VBoxContainer/GridContainer"]
+custom_minimum_size = Vector2(0, 36)
+layout_mode = 2
+size_flags_horizontal = 3
+text = "Submit Score"
+
+[node name="BtnGetLeaderboard" type="Button" parent="VBoxContainer/GridContainer"]
+custom_minimum_size = Vector2(0, 36)
+layout_mode = 2
+size_flags_horizontal = 3
+text = "Get Leaderboard"
+
+[node name="BtnGetCatalog" type="Button" parent="VBoxContainer/GridContainer"]
+custom_minimum_size = Vector2(0, 36)
+layout_mode = 2
+size_flags_horizontal = 3
+text = "Get Payments Catalog"
+
+[node name="BtnPurchase" type="Button" parent="VBoxContainer/GridContainer"]
+custom_minimum_size = Vector2(0, 36)
+layout_mode = 2
+size_flags_horizontal = 3
+text = "Buy 'coins_100'"
+
+[node name="BtnReview" type="Button" parent="VBoxContainer/GridContainer"]
+custom_minimum_size = Vector2(0, 36)
+layout_mode = 2
+size_flags_horizontal = 3
+text = "Request Review"
+
+[node name="BtnShortcut" type="Button" parent="VBoxContainer/GridContainer"]
+custom_minimum_size = Vector2(0, 36)
+layout_mode = 2
+size_flags_horizontal = 3
+text = "Add Shortcut"
+
+[node name="BtnEnvInfo" type="Button" parent="VBoxContainer/GridContainer"]
+custom_minimum_size = Vector2(0, 36)
+layout_mode = 2
+size_flags_horizontal = 3
+text = "Log Env & Device"
+
+[node name="BtnClearLog" type="Button" parent="VBoxContainer/GridContainer"]
+custom_minimum_size = Vector2(0, 36)
+layout_mode = 2
+size_flags_horizontal = 3
+text = "Clear Logs"
+
+[node name="LogPanel" type="Panel" parent="VBoxContainer"]
+layout_mode = 2
+size_flags_vertical = 3
+
+[node name="RichTextLabel" type="RichTextLabel" parent="VBoxContainer/LogPanel"]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_left = 10.0
+offset_top = 10.0
+offset_right = -10.0
+offset_bottom = -10.0
+grow_horizontal = 2
+grow_vertical = 2
+bbcode_enabled = true
+scroll_following = true
+
+[connection signal="pressed" from="VBoxContainer/GridContainer/BtnInterstitial" to="." method="_on_btn_interstitial_pressed"]
+[connection signal="pressed" from="VBoxContainer/GridContainer/BtnRewarded" to="." method="_on_btn_rewarded_pressed"]
+[connection signal="pressed" from="VBoxContainer/GridContainer/BtnBannerShow" to="." method="_on_btn_banner_show_pressed"]
+[connection signal="pressed" from="VBoxContainer/GridContainer/BtnBannerHide" to="." method="_on_btn_banner_hide_pressed"]
+[connection signal="pressed" from="VBoxContainer/GridContainer/BtnAuthDialog" to="." method="_on_btn_auth_dialog_pressed"]
+[connection signal="pressed" from="VBoxContainer/GridContainer/BtnSaveCloud" to="." method="_on_btn_save_cloud_pressed"]
+[connection signal="pressed" from="VBoxContainer/GridContainer/BtnLoadCloud" to="." method="_on_btn_load_cloud_pressed"]
+[connection signal="pressed" from="VBoxContainer/GridContainer/BtnIncStats" to="." method="_on_btn_inc_stats_pressed"]
+[connection signal="pressed" from="VBoxContainer/GridContainer/BtnSetScore" to="." method="_on_btn_set_score_pressed"]
+[connection signal="pressed" from="VBoxContainer/GridContainer/BtnGetLeaderboard" to="." method="_on_btn_get_leaderboard_pressed"]
+[connection signal="pressed" from="VBoxContainer/GridContainer/BtnGetCatalog" to="." method="_on_btn_get_catalog_pressed"]
+[connection signal="pressed" from="VBoxContainer/GridContainer/BtnPurchase" to="." method="_on_btn_purchase_pressed"]
+[connection signal="pressed" from="VBoxContainer/GridContainer/BtnReview" to="." method="_on_btn_review_pressed"]
+[connection signal="pressed" from="VBoxContainer/GridContainer/BtnShortcut" to="." method="_on_btn_shortcut_pressed"]
+[connection signal="pressed" from="VBoxContainer/GridContainer/BtnEnvInfo" to="." method="_on_btn_env_info_pressed"]
+[connection signal="pressed" from="VBoxContainer/GridContainer/BtnClearLog" to="." method="_on_btn_clear_log_pressed"]

@@ -1,0 +1,41 @@
+name: CI
+
+on:
+  push:
+    branches: [ main, master ]
+  pull_request:
+    branches: [ main, master ]
+
+jobs:
+  build-csharp:
+    name: Build & Verify C# Bindings
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '8.0.x'
+
+      - name: Build Solution
+        run: dotnet build YandexGamesSDK4Godot.csproj --configuration Release --verbosity normal
+
+  validate-addon:
+    name: Validate Addon Structure
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Check Required Addon Files
+        run: |
+          test -f addons/yandex_games/plugin.cfg || exit 1
+          test -f addons/yandex_games/yandex_games.gd || exit 1
+          test -f addons/yandex_games/bridge/yandex_bridge.js || exit 1
+          test -f addons/yandex_games/mock/mock_bridge.gd || exit 1
+          test -f addons/yandex_games/templates/yandex_template.html || exit 1
+          echo "Addon structure verified successfully."

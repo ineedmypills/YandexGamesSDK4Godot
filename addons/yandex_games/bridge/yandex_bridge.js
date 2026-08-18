@@ -1,0 +1,692 @@
+/**
+ * Yandex Games SDK Bridge for Godot 4.x
+ * High-performance browser bridge between Godot's JavaScriptBridge and official YaGames SDK.
+ */
+(function () {
+    'use strict';
+
+    if (window.GodotYandexBridge) {
+        return;
+    }
+
+    const Bridge = {
+        ysdk: null,
+        player: null,
+        payments: null,
+        leaderboards: null,
+        isInitialized: false,
+        pauseResumeCallback: null,
+
+        // --- Core & Lifecycle ---
+        async init(optionsJson, callback) {
+            try {
+                const options = optionsJson ? JSON.parse(optionsJson) : {};
+                if (typeof YaGames === 'undefined') {
+                    throw new Error("YaGames SDK script is not loaded in window.");
+                }
+
+                this.ysdk = await YaGames.init(options);
+                this.isInitialized = true;
+
+                // Subscribe to platform pause / resume events (requirement 1.3 / 4.7 / 1.19.4)
+                if (this.ysdk.on) {
+                    this.ysdk.on('game_api_pause', () => {
+                        if (this.pauseResumeCallback) {
+                            this.pauseResumeCallback(JSON.stringify({ event: 'pause' }));
+                        }
+                    });
+                    this.ysdk.on('game_api_resume', () => {
+                        if (this.pauseResumeCallback) {
+                            this.pauseResumeCallback(JSON.stringify({ event: 'resume' }));
+                        }
+                    });
+                }
+
+                const env = this.getEnvironment();
+                const device = this.getDeviceInfo();
+                callback(JSON.stringify({ success: true, data: { environment: env, device: device } }));
+            } catch (err) {
+                console.error("[GodotYandexBridge] Init error:", err);
+                callback(JSON.stringify({ success: false, error: err.message || String(err) }));
+            }
+        },
+
+        setPauseResumeCallback(cb) {
+            this.pauseResumeCallback = cb;
+        },
+
+        loadingReady() {
+            try {
+                if (this.ysdk && this.ysdk.features && this.ysdk.features.LoadingAPI) {
+                    this.ysdk.features.LoadingAPI.ready();
+                }
+            } catch (e) {
+                console.warn("[GodotYandexBridge] LoadingAPI.ready error:", e);
+            }
+        },
+
+        gameplayStart() {
+            try {
+                if (this.ysdk && this.ysdk.features && this.ysdk.features.GameplayAPI) {
+                    this.ysdk.features.GameplayAPI.start();
+                }
+            } catch (e) {
+                console.warn("[GodotYandexBridge] GameplayAPI.start error:", e);
+            }
+        },
+
+        gameplayStop() {
+            try {
+                if (this.ysdk && this.ysdk.features && this.ysdk.features.GameplayAPI) {
+                    this.ysdk.features.GameplayAPI.stop();
+                }
+            } catch (e) {
+                console.warn("[GodotYandexBridge] GameplayAPI.stop error:", e);
+            }
+        },
+
+        serverTime() {
+            try {
+                return this.ysdk ? this.ysdk.serverTime() : Date.now();
+            } catch (e) {
+                return Date.now();
+            }
+        },
+
+        async isAvailableMethod(methodName, callback) {
+            try {
+                if (!this.ysdk || !this.ysdk.isAvailableMethod) {
+                    callback(JSON.stringify({ success: true, available: false }));
+                    return;
+                }
+                const available = await this.ysdk.isAvailableMethod(methodName);
+                callback(JSON.stringify({ success: true, available: !!available }));
+            } catch (err) {
+                callback(JSON.stringify({ success: false, available: false, error: err.message || String(err) }));
+            }
+        },
+
+        // --- Environment & Device ---
+        getEnvironment() {
+            if (!this.ysdk) return {};
+            const env = this.ysdk.environment || {};
+            return {
+                app: env.app || {},
+                browser: env.browser || { lang: navigator.language || 'ru' },
+                i18n: env.i18n || { lang: 'ru', tld: 'ru' },
+                payload: env.payload || '',
+                fullscreen: !!(env.screen && env.screen.fullscreen)
+            };
+        },
+
+        getDeviceInfo() {
+            if (!this.ysdk) {
+                return {
+                    type: 'desktop',
+                    isMobile: false,
+                    isTablet: false,
+                    isDesktop: true,
+                    isTV: false
+                };
+            }
+            const info = this.ysdk.deviceInfo || {};
+            return {
+                type: info.type || 'desktop',
+                isMobile: typeof info.isMobile === 'function' ? info.isMobile() : info.type === 'mobile',
+                isTablet: typeof info.isTablet === 'function' ? info.isTablet() : info.type === 'tablet',
+                isDesktop: typeof info.isDesktop === 'function' ? info.isDesktop() : info.type === 'desktop',
+                isTV: typeof info.isTV === 'function' ? info.isTV() : info.type === 'tv'
+            };
+        },
+
+        // --- Screen & Fullscreen ---
+        fullscreenStatus() {
+            try {
+                return !!(this.ysdk && this.ysdk.screen && this.ysdk.screen.fullscreen && this.ysdk.screen.fullscreen.status === 'on');
+            } catch (e) {
+                return false;
+            }
+        },
+
+        async fullscreenRequest(callback) {
+            try {
+                if (this.ysdk && this.ysdk.screen && this.ysdk.screen.fullscreen) {
+                    await this.ysdk.screen.fullscreen.request();
+                    callback(JSON.stringify({ success: true, status: 'on' }));
+                } else {
+                    callback(JSON.stringify({ success: false, error: 'Screen API not available' }));
+                }
+            } catch (err) {
+                callback(JSON.stringify({ success: false, error: err.message || String(err) }));
+            }
+        },
+
+        async fullscreenExit(callback) {
+            try {
+                if (this.ysdk && this.ysdk.screen && this.ysdk.screen.fullscreen) {
+                    await this.ysdk.screen.fullscreen.exit();
+                    callback(JSON.stringify({ success: true, status: 'off' }));
+                } else {
+                    callback(JSON.stringify({ success: false, error: 'Screen API not available' }));
+                }
+            } catch (err) {
+                callback(JSON.stringify({ success: false, error: err.message || String(err) }));
+            }
+        },
+
+        // --- Advertisement ---
+        showFullscreenAdv(callback) {
+            if (!this.ysdk || !this.ysdk.adv) {
+                callback(JSON.stringify({ event: 'error', error: 'SDK not initialized' }));
+                return;
+            }
+
+            this.ysdk.adv.showFullscreenAdv({
+                callbacks: {
+                    onOpen: () => {
+                        callback(JSON.stringify({ event: 'open' }));
+                    },
+                    onClose: (wasShown) => {
+                        callback(JSON.stringify({ event: 'close', wasShown: !!wasShown }));
+                    },
+                    onError: (err) => {
+                        callback(JSON.stringify({ event: 'error', error: err ? (err.message || String(err)) : 'Unknown ad error' }));
+                    },
+                    onOffline: () => {
+                        callback(JSON.stringify({ event: 'offline' }));
+                    }
+                }
+            });
+        },
+
+        showRewardedVideo(callback) {
+            if (!this.ysdk || !this.ysdk.adv) {
+                callback(JSON.stringify({ event: 'error', error: 'SDK not initialized' }));
+                return;
+            }
+
+            this.ysdk.adv.showRewardedVideo({
+                callbacks: {
+                    onOpen: () => {
+                        callback(JSON.stringify({ event: 'open' }));
+                    },
+                    onRewarded: () => {
+                        callback(JSON.stringify({ event: 'rewarded' }));
+                    },
+                    onClose: (wasShown) => {
+                        callback(JSON.stringify({ event: 'close', wasShown: !!wasShown }));
+                    },
+                    onError: (err) => {
+                        callback(JSON.stringify({ event: 'error', error: err ? (err.message || String(err)) : 'Unknown rewarded ad error' }));
+                    }
+                }
+            });
+        },
+
+        async getBannerAdvStatus(callback) {
+            try {
+                if (!this.ysdk || !this.ysdk.adv || !this.ysdk.adv.getBannerAdvStatus) {
+                    callback(JSON.stringify({ success: true, stickyAdvIsShowing: false, reason: 'ADV_IS_NOT_CONNECTED' }));
+                    return;
+                }
+                const res = await this.ysdk.adv.getBannerAdvStatus();
+                callback(JSON.stringify({ success: true, stickyAdvIsShowing: !!res.stickyAdvIsShowing, reason: res.reason || null }));
+            } catch (err) {
+                callback(JSON.stringify({ success: false, error: err.message || String(err) }));
+            }
+        },
+
+        async showBannerAdv(callback) {
+            try {
+                if (!this.ysdk || !this.ysdk.adv || !this.ysdk.adv.showBannerAdv) {
+                    callback(JSON.stringify({ success: false, error: 'Banner API not available' }));
+                    return;
+                }
+                const res = await this.ysdk.adv.showBannerAdv();
+                callback(JSON.stringify({ success: true, stickyAdvIsShowing: !!res.stickyAdvIsShowing, reason: res.reason || null }));
+            } catch (err) {
+                callback(JSON.stringify({ success: false, error: err.message || String(err) }));
+            }
+        },
+
+        async hideBannerAdv(callback) {
+            try {
+                if (!this.ysdk || !this.ysdk.adv || !this.ysdk.adv.hideBannerAdv) {
+                    callback(JSON.stringify({ success: false, error: 'Banner API not available' }));
+                    return;
+                }
+                const res = await this.ysdk.adv.hideBannerAdv();
+                callback(JSON.stringify({ success: true, stickyAdvIsShowing: !!res.stickyAdvIsShowing }));
+            } catch (err) {
+                callback(JSON.stringify({ success: false, error: err.message || String(err) }));
+            }
+        },
+
+        // --- Player & Auth ---
+        async initPlayer(optionsJson, callback) {
+            try {
+                if (!this.ysdk) throw new Error("SDK not initialized");
+                const options = optionsJson ? JSON.parse(optionsJson) : {};
+                this.player = await this.ysdk.getPlayer(options);
+
+                const data = {
+                    isAuthorized: this.player.isAuthorized(),
+                    uniqueId: this.player.getUniqueID ? this.player.getUniqueID() : '',
+                    name: this.player.getName ? this.player.getName() : '',
+                    photoSmall: this.player.getPhoto ? this.player.getPhoto('small') : '',
+                    photoMedium: this.player.getPhoto ? this.player.getPhoto('medium') : '',
+                    photoLarge: this.player.getPhoto ? this.player.getPhoto('large') : '',
+                    payingStatus: this.player.getPayingStatus ? this.player.getPayingStatus() : '',
+                    signature: this.player.getSignature ? this.player.getSignature() : ''
+                };
+                callback(JSON.stringify({ success: true, data: data }));
+            } catch (err) {
+                console.error("[GodotYandexBridge] initPlayer error:", err);
+                callback(JSON.stringify({ success: false, error: err.message || String(err) }));
+            }
+        },
+
+        async openAuthDialog(callback) {
+            try {
+                if (!this.ysdk || !this.ysdk.auth) throw new Error("Auth API not available");
+                await this.ysdk.auth.openAuthDialog();
+                if (this.ysdk.getPlayer) {
+                    this.player = await this.ysdk.getPlayer({ scopes: false });
+                }
+                const isAuth = this.player ? this.player.isAuthorized() : false;
+                callback(JSON.stringify({
+                    success: true,
+                    data: {
+                        isAuthorized: isAuth,
+                        uniqueId: (isAuth && this.player.getUniqueID) ? this.player.getUniqueID() : '',
+                        name: (isAuth && this.player.getName) ? this.player.getName() : '',
+                        photoSmall: (isAuth && this.player.getPhoto) ? this.player.getPhoto('small') : '',
+                        photoMedium: (isAuth && this.player.getPhoto) ? this.player.getPhoto('medium') : '',
+                        photoLarge: (isAuth && this.player.getPhoto) ? this.player.getPhoto('large') : ''
+                    }
+                }));
+            } catch (err) {
+                callback(JSON.stringify({ success: false, error: err.message || String(err) }));
+            }
+        },
+
+        async getPlayerIDsPerGame(callback) {
+            try {
+                if (!this.player || !this.player.getIDsPerGame) throw new Error("Player not initialized or not authorized");
+                const ids = await this.player.getIDsPerGame();
+                callback(JSON.stringify({ success: true, data: ids }));
+            } catch (err) {
+                callback(JSON.stringify({ success: false, error: err.message || String(err) }));
+            }
+        },
+
+        async getPlayerData(keysJson, callback) {
+            try {
+                if (!this.player) throw new Error("Player not initialized");
+                const keys = keysJson ? JSON.parse(keysJson) : undefined;
+                const data = await this.player.getData(keys);
+                callback(JSON.stringify({ success: true, data: data || {} }));
+            } catch (err) {
+                callback(JSON.stringify({ success: false, error: err.message || String(err) }));
+            }
+        },
+
+        async setPlayerData(dataJson, flush, callback) {
+            try {
+                if (!this.player) throw new Error("Player not initialized");
+                const data = JSON.parse(dataJson);
+                await this.player.setData(data, !!flush);
+                callback(JSON.stringify({ success: true }));
+            } catch (err) {
+                callback(JSON.stringify({ success: false, error: err.message || String(err) }));
+            }
+        },
+
+        async getPlayerStats(keysJson, callback) {
+            try {
+                if (!this.player) throw new Error("Player not initialized");
+                const keys = keysJson ? JSON.parse(keysJson) : undefined;
+                const stats = await this.player.getStats(keys);
+                callback(JSON.stringify({ success: true, data: stats || {} }));
+            } catch (err) {
+                callback(JSON.stringify({ success: false, error: err.message || String(err) }));
+            }
+        },
+
+        async setPlayerStats(statsJson, callback) {
+            try {
+                if (!this.player) throw new Error("Player not initialized");
+                const stats = JSON.parse(statsJson);
+                await this.player.setStats(stats);
+                callback(JSON.stringify({ success: true }));
+            } catch (err) {
+                callback(JSON.stringify({ success: false, error: err.message || String(err) }));
+            }
+        },
+
+        async incrementPlayerStats(incrementsJson, callback) {
+            try {
+                if (!this.player) throw new Error("Player not initialized");
+                const increments = JSON.parse(incrementsJson);
+                const result = await this.player.incrementStats(increments);
+                callback(JSON.stringify({ success: true, data: result || {} }));
+            } catch (err) {
+                callback(JSON.stringify({ success: false, error: err.message || String(err) }));
+            }
+        },
+
+        // --- Leaderboards ---
+        async getLeaderboardsInstance() {
+            if (this.leaderboards) return this.leaderboards;
+            if (this.ysdk.leaderboards) {
+                this.leaderboards = this.ysdk.leaderboards;
+                return this.leaderboards;
+            }
+            if (this.ysdk.getLeaderboards) {
+                this.leaderboards = await this.ysdk.getLeaderboards();
+                return this.leaderboards;
+            }
+            throw new Error("Leaderboards API not available");
+        },
+
+        async getLeaderboardDescription(name, callback) {
+            try {
+                const lb = await this.getLeaderboardsInstance();
+                const desc = await lb.getLeaderboardDescription(name);
+                callback(JSON.stringify({ success: true, data: desc }));
+            } catch (err) {
+                callback(JSON.stringify({ success: false, error: err.message || String(err) }));
+            }
+        },
+
+        async setLeaderboardScore(name, score, extraData, callback) {
+            try {
+                const lb = await this.getLeaderboardsInstance();
+                await lb.setLeaderboardScore(name, score, extraData || undefined);
+                callback(JSON.stringify({ success: true }));
+            } catch (err) {
+                callback(JSON.stringify({ success: false, error: err.message || String(err) }));
+            }
+        },
+
+        async getLeaderboardPlayerEntry(name, callback) {
+            try {
+                const lb = await this.getLeaderboardsInstance();
+                const entry = await lb.getLeaderboardPlayerEntry(name);
+                callback(JSON.stringify({ success: true, data: entry }));
+            } catch (err) {
+                callback(JSON.stringify({ success: false, error: err.message || String(err) }));
+            }
+        },
+
+        async getLeaderboardEntries(name, optionsJson, callback) {
+            try {
+                const lb = await this.getLeaderboardsInstance();
+                const options = optionsJson ? JSON.parse(optionsJson) : {};
+                const entries = await lb.getLeaderboardEntries(name, options);
+                callback(JSON.stringify({ success: true, data: entries }));
+            } catch (err) {
+                callback(JSON.stringify({ success: false, error: err.message || String(err) }));
+            }
+        },
+
+        // --- Payments & In-App Purchases ---
+        async initPayments(optionsJson, callback) {
+            try {
+                if (!this.ysdk) throw new Error("SDK not initialized");
+                const options = optionsJson ? JSON.parse(optionsJson) : {};
+                if (this.ysdk.getPayments) {
+                    this.payments = await this.ysdk.getPayments(options);
+                } else if (this.ysdk.payments) {
+                    this.payments = this.ysdk.payments;
+                } else {
+                    throw new Error("Payments API not available");
+                }
+                callback(JSON.stringify({ success: true }));
+            } catch (err) {
+                callback(JSON.stringify({ success: false, error: err.message || String(err) }));
+            }
+        },
+
+        async purchase(optionsJson, callback) {
+            try {
+                if (!this.payments) await this.initPayments(null, () => {});
+                if (!this.payments) throw new Error("Payments not initialized");
+                const options = JSON.parse(optionsJson);
+                const purchase = await this.payments.purchase(options);
+                callback(JSON.stringify({ success: true, data: purchase }));
+            } catch (err) {
+                callback(JSON.stringify({ success: false, error: err.message || String(err) }));
+            }
+        },
+
+        async getPurchases(callback) {
+            try {
+                if (!this.payments) await this.initPayments(null, () => {});
+                if (!this.payments) throw new Error("Payments not initialized");
+                const purchases = await this.payments.getPurchases();
+                callback(JSON.stringify({ success: true, data: purchases || [] }));
+            } catch (err) {
+                callback(JSON.stringify({ success: false, error: err.message || String(err) }));
+            }
+        },
+
+        async getCatalog(callback) {
+            try {
+                if (!this.payments) await this.initPayments(null, () => {});
+                if (!this.payments) throw new Error("Payments not initialized");
+                const catalog = await this.payments.getCatalog();
+                callback(JSON.stringify({ success: true, data: catalog || [] }));
+            } catch (err) {
+                callback(JSON.stringify({ success: false, error: err.message || String(err) }));
+            }
+        },
+
+        async consumePurchase(purchaseToken, callback) {
+            try {
+                if (!this.payments) await this.initPayments(null, () => {});
+                if (!this.payments) throw new Error("Payments not initialized");
+                await this.payments.consumePurchase(purchaseToken);
+                callback(JSON.stringify({ success: true }));
+            } catch (err) {
+                callback(JSON.stringify({ success: false, error: err.message || String(err) }));
+            }
+        },
+
+        // --- Feedback / Review ---
+        async canReview(callback) {
+            try {
+                if (!this.ysdk || !this.ysdk.feedback || !this.ysdk.feedback.canReview) {
+                    callback(JSON.stringify({ success: true, data: { value: false, reason: 'UNKNOWN' } }));
+                    return;
+                }
+                const res = await this.ysdk.feedback.canReview();
+                callback(JSON.stringify({ success: true, data: res }));
+            } catch (err) {
+                callback(JSON.stringify({ success: false, error: err.message || String(err) }));
+            }
+        },
+
+        async requestReview(callback) {
+            try {
+                if (!this.ysdk || !this.ysdk.feedback || !this.ysdk.feedback.requestReview) {
+                    callback(JSON.stringify({ success: false, error: 'Feedback API not available' }));
+                    return;
+                }
+                const res = await this.ysdk.feedback.requestReview();
+                callback(JSON.stringify({ success: true, data: res }));
+            } catch (err) {
+                callback(JSON.stringify({ success: false, error: err.message || String(err) }));
+            }
+        },
+
+        // --- Shortcut ---
+        async canShowPrompt(callback) {
+            try {
+                if (!this.ysdk || !this.ysdk.shortcut || !this.ysdk.shortcut.canShowPrompt) {
+                    callback(JSON.stringify({ success: true, data: { canShow: false } }));
+                    return;
+                }
+                const res = await this.ysdk.shortcut.canShowPrompt();
+                callback(JSON.stringify({ success: true, data: res }));
+            } catch (err) {
+                callback(JSON.stringify({ success: false, error: err.message || String(err) }));
+            }
+        },
+
+        async showPrompt(callback) {
+            try {
+                if (!this.ysdk || !this.ysdk.shortcut || !this.ysdk.shortcut.showPrompt) {
+                    callback(JSON.stringify({ success: false, error: 'Shortcut API not available' }));
+                    return;
+                }
+                const res = await this.ysdk.shortcut.showPrompt();
+                callback(JSON.stringify({ success: true, data: res }));
+            } catch (err) {
+                callback(JSON.stringify({ success: false, error: err.message || String(err) }));
+            }
+        },
+
+        // --- Remote Config / Flags ---
+        async getFlags(paramsJson, callback) {
+            try {
+                if (!this.ysdk || !this.ysdk.getFlags) {
+                    callback(JSON.stringify({ success: true, data: {} }));
+                    return;
+                }
+                const params = paramsJson ? JSON.parse(paramsJson) : {};
+                const flags = await this.ysdk.getFlags(params);
+                callback(JSON.stringify({ success: true, data: flags || {} }));
+            } catch (err) {
+                callback(JSON.stringify({ success: false, error: err.message || String(err) }));
+            }
+        },
+
+        // --- Cross-Promotion / Other Games ---
+        async getAllGames(callback) {
+            try {
+                if (!this.ysdk || !this.ysdk.features || !this.ysdk.features.GamesAPI || !this.ysdk.features.GamesAPI.getAllGames) {
+                    callback(JSON.stringify({ success: true, data: [] }));
+                    return;
+                }
+                const games = await this.ysdk.features.GamesAPI.getAllGames();
+                callback(JSON.stringify({ success: true, data: games || [] }));
+            } catch (err) {
+                callback(JSON.stringify({ success: false, error: err.message || String(err) }));
+            }
+        },
+
+        async getGameByID(appId, callback) {
+            try {
+                if (!this.ysdk || !this.ysdk.features || !this.ysdk.features.GamesAPI || !this.ysdk.features.GamesAPI.getGameByID) {
+                    callback(JSON.stringify({ success: false, error: 'GamesAPI not available' }));
+                    return;
+                }
+                const game = await this.ysdk.features.GamesAPI.getGameByID(appId);
+                callback(JSON.stringify({ success: true, data: game }));
+            } catch (err) {
+                callback(JSON.stringify({ success: false, error: err.message || String(err) }));
+            }
+        },
+
+        // --- Clipboard ---
+        async clipboardWriteText(text, callback) {
+            try {
+                if (this.ysdk && this.ysdk.clipboard && this.ysdk.clipboard.writeText) {
+                    await this.ysdk.clipboard.writeText(text);
+                    callback(JSON.stringify({ success: true }));
+                } else if (navigator.clipboard && navigator.clipboard.writeText) {
+                    await navigator.clipboard.writeText(text);
+                    callback(JSON.stringify({ success: true }));
+                } else {
+                    callback(JSON.stringify({ success: false, error: 'Clipboard API not supported' }));
+                }
+            } catch (err) {
+                callback(JSON.stringify({ success: false, error: err.message || String(err) }));
+            }
+        },
+
+        // --- Safe Storage Helper ---
+        async getStorageItem(key, callback) {
+            try {
+                let storage = window.localStorage;
+                if (this.ysdk && this.ysdk.getStorage) {
+                    storage = await this.ysdk.getStorage();
+                }
+                const val = storage.getItem(key);
+                callback(JSON.stringify({ success: true, value: val }));
+            } catch (err) {
+                callback(JSON.stringify({ success: false, error: err.message || String(err) }));
+            }
+        },
+
+        async setStorageItem(key, value, callback) {
+            try {
+                let storage = window.localStorage;
+                if (this.ysdk && this.ysdk.getStorage) {
+                    storage = await this.ysdk.getStorage();
+                }
+                storage.setItem(key, value);
+                callback(JSON.stringify({ success: true }));
+            } catch (err) {
+                callback(JSON.stringify({ success: false, error: err.message || String(err) }));
+            }
+        },
+
+        // --- Asynchronous Multiplayer Sessions ---
+        async multiplayerInitSessions(optionsJson, callback) {
+            try {
+                if (!this.ysdk || !this.ysdk.multiplayer || !this.ysdk.multiplayer.sessions) {
+                    callback(JSON.stringify({ success: false, error: 'Multiplayer not available' }));
+                    return;
+                }
+                const options = optionsJson ? JSON.parse(optionsJson) : {};
+                const opponents = await this.ysdk.multiplayer.sessions.init(options);
+
+                if (options.isEventBased && this.ysdk.on) {
+                    this.ysdk.on('multiplayer-sessions-transaction', (data) => {
+                        if (this.pauseResumeCallback) {
+                            this.pauseResumeCallback(JSON.stringify({ event: 'multiplayer_transaction', data: data }));
+                        }
+                    });
+                    this.ysdk.on('multiplayer-sessions-finish', (opponentId) => {
+                        if (this.pauseResumeCallback) {
+                            this.pauseResumeCallback(JSON.stringify({ event: 'multiplayer_finish', opponentId: opponentId }));
+                        }
+                    });
+                }
+
+                callback(JSON.stringify({ success: true, data: opponents || [] }));
+            } catch (err) {
+                callback(JSON.stringify({ success: false, error: err.message || String(err) }));
+            }
+        },
+
+        multiplayerCommit(payloadJson) {
+            try {
+                if (this.ysdk && this.ysdk.multiplayer && this.ysdk.multiplayer.sessions) {
+                    const payload = JSON.parse(payloadJson);
+                    this.ysdk.multiplayer.sessions.commit(payload);
+                }
+            } catch (e) {
+                console.warn("[GodotYandexBridge] multiplayerCommit error:", e);
+            }
+        },
+
+        async multiplayerPush(metaJson, callback) {
+            try {
+                if (!this.ysdk || !this.ysdk.multiplayer || !this.ysdk.multiplayer.sessions) {
+                    callback(JSON.stringify({ success: false, error: 'Multiplayer not available' }));
+                    return;
+                }
+                const meta = JSON.parse(metaJson);
+                await this.ysdk.multiplayer.sessions.push(meta);
+                callback(JSON.stringify({ success: true }));
+            } catch (err) {
+                callback(JSON.stringify({ success: false, error: err.message || String(err) }));
+            }
+        }
+    };
+
+    window.GodotYandexBridge = Bridge;
+})();

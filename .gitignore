@@ -1,0 +1,21 @@
+# Godot 4 specific ignores
+.godot/
+*.translation
+
+# Mono / C# ignores
+.mono/
+bin/
+obj/
+*.sln.DotSettings.user
+
+# IDEs & System
+.idea/
+.vscode/
+*.tmp
+.DS_Store
+Thumbs.db
+
+# Export / Build artifacts
+export/
+builds/
+yandex_mock_data.json
