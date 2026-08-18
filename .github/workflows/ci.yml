@@ -1,10 +1,14 @@
-name: CI
+name: CI & Release
 
 on:
   push:
     branches: [ main, master ]
+    tags: [ 'v*' ]
   pull_request:
     branches: [ main, master ]
+
+permissions:
+  contents: write
 
 jobs:
   build-csharp:
@@ -39,3 +43,27 @@ jobs:
           test -f addons/yandex_games/mock/mock_bridge.gd || exit 1
           test -f addons/yandex_games/templates/yandex_template.html || exit 1
           echo "Addon structure verified successfully."
+
+  release:
+    name: Package & Publish Release Asset
+    needs: [ build-csharp, validate-addon ]
+    if: startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Package Addon Archive
+        run: |
+          ZIP_NAME="yandex-games-sdk-${{ github.ref_name }}.zip"
+          zip -r "$ZIP_NAME" addons README.md LICENSE icon.png examples project.godot
+          ls -lh "$ZIP_NAME"
+
+      - name: Upload Asset to GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: yandex-games-sdk-${{ github.ref_name }}.zip
+          generate_release_notes: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
