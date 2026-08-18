@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="icon.svg" alt="Yandex Games SDK for Godot" width="128" height="128">
+  <img src="addons/yandex_games/icon.svg" alt="Yandex Games SDK for Godot" width="128" height="128">
 </p>
 
 <h1 align="center">Yandex Games SDK for Godot 4</h1>
