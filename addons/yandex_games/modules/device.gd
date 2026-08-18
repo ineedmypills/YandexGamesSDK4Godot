@@ -6,7 +6,7 @@ extends RefCounted
 
 signal fullscreen_changed(is_fullscreen: bool)
 
-var _core = null
+var _core: Node = null
 var _info: Dictionary = {
 	"type": "desktop",
 	"isMobile": false,
@@ -15,7 +15,7 @@ var _info: Dictionary = {
 	"isTV": false
 }
 
-func _init(core) -> void:
+func _init(core: Node) -> void:
 	_core = core
 
 func _update_info(info: Dictionary) -> void:
@@ -23,7 +23,7 @@ func _update_info(info: Dictionary) -> void:
 
 ## Returns device type string: 'desktop', 'mobile', 'tablet', or 'tv'.
 func get_type() -> String:
-	return _info.get("type", "desktop")
+	return str(_info.get("type", "desktop"))
 
 ## Returns true if running on a mobile smartphone.
 func is_mobile() -> bool:
@@ -44,7 +44,7 @@ func is_tv() -> bool:
 ## Returns true if game is currently in browser fullscreen mode.
 func is_fullscreen() -> bool:
 	if _core.is_web():
-		var bridge = JavaScriptBridge.get_interface("GodotYandexBridge")
+		var bridge: JavaScriptObject = JavaScriptBridge.get_interface("GodotYandexBridge")
 		if bridge:
 			return bridge.fullscreenStatus()
 		return false
@@ -59,7 +59,7 @@ func request_fullscreen() -> bool:
 	else:
 		res = _core.mock_bridge.fullscreen_request()
 	
-	var ok = res.get("success", false)
+	var ok: bool = res.get("success", false)
 	if ok:
 		fullscreen_changed.emit(true)
 	return ok
@@ -72,7 +72,7 @@ func exit_fullscreen() -> bool:
 	else:
 		res = _core.mock_bridge.fullscreen_exit()
 	
-	var ok = res.get("success", false)
+	var ok: bool = res.get("success", false)
 	if ok:
 		fullscreen_changed.emit(false)
 	return ok

@@ -5,12 +5,12 @@ extends RefCounted
 ## Manages Asynchronous Multiplayer Sessions (ysdk.multiplayer.sessions).
 ## Allows recording player actions as ghost/replay timelines and playing against other players' sessions.
 
-signal transaction_received(opponent_id: String, transactions: Array)
+signal transaction_received(opponent_id: String, transactions: Array[Dictionary])
 signal session_finished(opponent_id: String)
 
-var _core = null
+var _core: Node = null
 
-func _init(core) -> void:
+func _init(core: Node) -> void:
 	_core = core
 
 ## Initializes asynchronous multiplayer sessions and fetches opponent replays.
@@ -19,19 +19,23 @@ func _init(core) -> void:
 ## - isEventBased: bool (if true, events are automatically dispatched via signals)
 ## - maxOpponentTurnTime: int (in milliseconds)
 ## - meta: { "meta1": { "min": 0, "max": 1000 }, ... }
-func init_sessions(options: Dictionary) -> Array:
+func init_sessions(options: Dictionary) -> Array[Dictionary]:
 	var res: Dictionary
 	if _core.is_web():
 		res = await _core.call_js_async("multiplayerInitSessions", [JSON.stringify(options)])
+		var sessions: Array[Dictionary] = []
+		if res.get("success", false):
+			for item: Dictionary in res.get("data", []):
+				sessions.append(item)
+		return sessions
 	else:
-		res = _core.mock_bridge.multiplayer_init_sessions(options)
-	return res.get("data", []) if res.get("success", false) else []
+		return _core.mock_bridge.multiplayer_init_sessions(options)
 
 ## Commits a transaction / key action event to current session timeline.
 ## Example payload: { "x": 10.5, "y": 20.0, "action": "jump" }
 func commit(payload: Dictionary) -> void:
 	if _core.is_web():
-		var bridge = JavaScriptBridge.get_interface("GodotYandexBridge")
+		var bridge: JavaScriptObject = JavaScriptBridge.get_interface("GodotYandexBridge")
 		if bridge:
 			bridge.multiplayerCommit(JSON.stringify(payload))
 	else:

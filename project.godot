@@ -8,7 +8,7 @@ config_version=5
 
 config/name="Yandex Games SDK 4 Godot"
 config/description="Yandex Games SDK plugin for Godot 4.x"
-config/version="1.0.0"
+config/version="1.1.0"
 run/main_scene="res://examples/demo.tscn"
 config/features=PackedStringArray("4.3", "Forward Plus")
 config/icon="res://icon.svg"
@@ -27,3 +27,13 @@ window/size/viewport_width=1152
 window/size/viewport_height=648
 window/stretch/mode="canvas_items"
 window/stretch/aspect="expand"
+
+[debug]
+
+gdscript/warnings/untyped_declaration=2
+gdscript/warnings/inferred_declaration=0
+gdscript/warnings/unsafe_property_access=1
+gdscript/warnings/unsafe_method_access=1
+gdscript/warnings/unsafe_cast=1
+gdscript/warnings/unsafe_call_argument=1
+gdscript/warnings/return_value_discarded=1

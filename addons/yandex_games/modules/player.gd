@@ -11,7 +11,7 @@ signal data_saved
 signal stats_loaded(stats: Dictionary)
 signal stats_saved
 
-var _core = null
+var _core: Node = null
 var _info: Dictionary = {
 	"isAuthorized": false,
 	"uniqueId": "",
@@ -22,7 +22,7 @@ var _info: Dictionary = {
 	"payingStatus": ""
 }
 
-func _init(core) -> void:
+func _init(core: Node) -> void:
 	_core = core
 
 ## Initializes the Player object with optional parameters (e.g. scopes, signed).
@@ -38,7 +38,7 @@ func init(options: Dictionary = {}) -> Dictionary:
 		if is_authorized():
 			authorized.emit(_info)
 	else:
-		auth_failed.emit(res.get("error", "Player init failed"))
+		auth_failed.emit(str(res.get("error", "Player init failed")))
 	return _info
 
 ## Opens the native Yandex Games authorization popup dialog.
@@ -54,7 +54,7 @@ func open_auth_dialog() -> Dictionary:
 		if is_authorized():
 			authorized.emit(_info)
 	else:
-		auth_failed.emit(res.get("error", "Auth dialog failed"))
+		auth_failed.emit(str(res.get("error", "Auth dialog failed")))
 	return _info
 
 ## Returns true if the current player is authorized via Yandex ID.
@@ -63,49 +63,53 @@ func is_authorized() -> bool:
 
 ## Returns the unique permanent identifier of the player.
 func get_id() -> String:
-	return _info.get("uniqueId", "")
+	return str(_info.get("uniqueId", ""))
 
 ## Returns the public nickname/name of the player.
 func get_name() -> String:
-	return _info.get("name", "")
+	return str(_info.get("name", ""))
 
 ## Returns the player's avatar photo URL ("small", "medium", or "large").
 func get_photo(size: String = "medium") -> String:
 	match size.to_lower():
 		"small":
-			return _info.get("photoSmall", "")
+			return str(_info.get("photoSmall", ""))
 		"large":
-			return _info.get("photoLarge", "")
+			return str(_info.get("photoLarge", ""))
 		_:
-			return _info.get("photoMedium", "")
+			return str(_info.get("photoMedium", ""))
 
 ## Returns player paying status ("paying" or "").
 func get_paying_status() -> String:
-	return _info.get("payingStatus", "")
+	return str(_info.get("payingStatus", ""))
 
 ## Returns cryptographic signature for backend validation if initialized with signed: true.
 func get_signature() -> String:
-	return _info.get("signature", "")
+	return str(_info.get("signature", ""))
 
 ## Returns user IDs across other games by the same developer.
-func get_ids_per_game() -> Array:
+func get_ids_per_game() -> Array[Dictionary]:
 	if _core.is_web():
-		var res = await _core.call_js_async("getPlayerIDsPerGame")
-		return res.get("data", []) if res.get("success", false) else []
+		var res: Dictionary = await _core.call_js_async("getPlayerIDsPerGame")
+		if res.get("success", false):
+			var list: Array[Dictionary] = []
+			for item: Dictionary in res.get("data", []):
+				list.append(item)
+			return list
+		return []
 	else:
-		var res = _core.mock_bridge.get_player_ids_per_game()
-		return res.get("data", [])
+		return _core.mock_bridge.get_player_ids_per_game()
 
 ## Retrieves in-game data (cloud save). Pass an Array of String keys or null to retrieve all.
 func get_data(keys: Variant = null) -> Dictionary:
 	var res: Dictionary
 	if _core.is_web():
-		var keys_json = JSON.stringify(keys) if keys != null else ""
+		var keys_json: String = JSON.stringify(keys) if keys != null else ""
 		res = await _core.call_js_async("getPlayerData", [keys_json])
 	else:
 		res = _core.mock_bridge.get_player_data(keys)
 	
-	var data = res.get("data", {}) if res.get("success", false) else {}
+	var data: Dictionary = res.get("data", {}) if res.get("success", false) else {}
 	data_loaded.emit(data)
 	return data
 
@@ -117,7 +121,7 @@ func set_data(data: Dictionary, flush: bool = false) -> bool:
 	else:
 		res = _core.mock_bridge.set_player_data(data, flush)
 	
-	var ok = res.get("success", false)
+	var ok: bool = res.get("success", false)
 	if ok:
 		data_saved.emit()
 	return ok
@@ -126,12 +130,12 @@ func set_data(data: Dictionary, flush: bool = false) -> bool:
 func get_stats(keys: Variant = null) -> Dictionary:
 	var res: Dictionary
 	if _core.is_web():
-		var keys_json = JSON.stringify(keys) if keys != null else ""
+		var keys_json: String = JSON.stringify(keys) if keys != null else ""
 		res = await _core.call_js_async("getPlayerStats", [keys_json])
 	else:
 		res = _core.mock_bridge.get_player_stats(keys)
 	
-	var stats = res.get("data", {}) if res.get("success", false) else {}
+	var stats: Dictionary = res.get("data", {}) if res.get("success", false) else {}
 	stats_loaded.emit(stats)
 	return stats
 
@@ -143,7 +147,7 @@ func set_stats(stats: Dictionary) -> bool:
 	else:
 		res = _core.mock_bridge.set_player_stats(stats)
 	
-	var ok = res.get("success", false)
+	var ok: bool = res.get("success", false)
 	if ok:
 		stats_saved.emit()
 	return ok
@@ -157,7 +161,7 @@ func increment_stats(increments: Dictionary) -> Dictionary:
 	else:
 		res = _core.mock_bridge.increment_player_stats(increments)
 	
-	var updated_stats = res.get("data", {}) if res.get("success", false) else {}
+	var updated_stats: Dictionary = res.get("data", {}) if res.get("success", false) else {}
 	if res.get("success", false):
 		stats_saved.emit()
 	return updated_stats

@@ -6,12 +6,12 @@ extends RefCounted
 
 signal purchase_success(purchase: Dictionary)
 signal purchase_failed(error: String)
-signal catalog_loaded(catalog: Array)
-signal purchases_loaded(purchases: Array)
+signal catalog_loaded(catalog: Array[Dictionary])
+signal purchases_loaded(purchases: Array[Dictionary])
 
-var _core = null
+var _core: Node = null
 
-func _init(core) -> void:
+func _init(core: Node) -> void:
 	_core = core
 
 ## Initializes the Payments subsystem (optional signed parameter).
@@ -27,7 +27,7 @@ func init(options: Dictionary = {}) -> bool:
 ## Returns Dictionary with purchase data or empty on failure.
 func purchase(product_id: String, developer_payload: String = "") -> Dictionary:
 	var res: Dictionary
-	var options = {
+	var options: Dictionary = {
 		"id": product_id,
 		"developerPayload": developer_payload
 	}
@@ -38,37 +38,45 @@ func purchase(product_id: String, developer_payload: String = "") -> Dictionary:
 		res = _core.mock_bridge.purchase(options)
 	
 	if res.get("success", false):
-		var purchase_data = res.get("data", {})
+		var purchase_data: Dictionary = res.get("data", {})
 		purchase_success.emit(purchase_data)
 		return purchase_data
 	else:
-		var err = res.get("error", "Purchase failed")
+		var err: String = str(res.get("error", "Purchase failed"))
 		purchase_failed.emit(err)
 		return {}
 
 ## Retrieves the in-game products catalog configured in Yandex Console.
-func get_catalog() -> Array:
+func get_catalog() -> Array[Dictionary]:
 	var res: Dictionary
 	if _core.is_web():
 		res = await _core.call_js_async("getCatalog")
+		var catalog: Array[Dictionary] = []
+		if res.get("success", false):
+			for item: Dictionary in res.get("data", []):
+				catalog.append(item)
+		catalog_loaded.emit(catalog)
+		return catalog
 	else:
-		res = _core.mock_bridge.get_catalog()
-	
-	var catalog = res.get("data", []) if res.get("success", false) else []
-	catalog_loaded.emit(catalog)
-	return catalog
+		var catalog: Array[Dictionary] = _core.mock_bridge.get_catalog()
+		catalog_loaded.emit(catalog)
+		return catalog
 
 ## Retrieves a list of all active (unconsumed / permanent) purchases.
-func get_purchases() -> Array:
+func get_purchases() -> Array[Dictionary]:
 	var res: Dictionary
 	if _core.is_web():
 		res = await _core.call_js_async("getPurchases")
+		var purchases: Array[Dictionary] = []
+		if res.get("success", false):
+			for item: Dictionary in res.get("data", []):
+				purchases.append(item)
+		purchases_loaded.emit(purchases)
+		return purchases
 	else:
-		res = _core.mock_bridge.get_purchases()
-	
-	var purchases = res.get("data", []) if res.get("success", false) else []
-	purchases_loaded.emit(purchases)
-	return purchases
+		var purchases: Array[Dictionary] = _core.mock_bridge.get_purchases()
+		purchases_loaded.emit(purchases)
+		return purchases
 
 ## Consumes a consumable in-app purchase using its purchaseToken.
 func consume_purchase(purchase_token: String) -> bool:

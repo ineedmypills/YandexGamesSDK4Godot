@@ -1,8 +1,8 @@
 @tool
 extends EditorPlugin
 
-const AUTOLOAD_NAME = "YandexGames"
-const AUTOLOAD_PATH = "res://addons/yandex_games/yandex_games.gd"
+const AUTOLOAD_NAME: String = "YandexGames"
+const AUTOLOAD_PATH: String = "res://addons/yandex_games/yandex_games.gd"
 
 var _export_plugin: YandexGamesExportPlugin = null
 

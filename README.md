@@ -323,13 +323,13 @@ if await YandexGames.shortcut.can_show_prompt():
 
 ### Asynchronous Multiplayer Sessions
 
-Submodule: `YandexGames.multiplayer`.
+Submodule: `YandexGames.multiplayer_sessions`.
 
 Record player timeline transactions and play against ghost opponents without maintaining custom backend servers.
 
 ```gdscript
 # 1. Initialize sessions and fetch opponents
-var opponents: Array = await YandexGames.multiplayer.init_sessions({
+var opponents: Array[Dictionary] = await YandexGames.multiplayer_sessions.init_sessions({
     "count": 2,
     "isEventBased": true,
     "maxOpponentTurnTime": 3000,
@@ -339,16 +339,16 @@ var opponents: Array = await YandexGames.multiplayer.init_sessions({
 })
 
 # 2. Commit player actions during gameplay
-YandexGames.multiplayer.commit({ "action": "jump", "x": 12.4, "y": 4.0 })
+YandexGames.multiplayer_sessions.commit({ "action": "jump", "x": 12.4, "y": 4.0 })
 
 # 3. Publish session on match finish
-await YandexGames.multiplayer.push({ "meta1": final_score })
+await YandexGames.multiplayer_sessions.push({ "meta1": final_score })
 
 # Signals for event-based playback:
-YandexGames.multiplayer.transaction_received.connect(func(opponent_id, transactions):
+YandexGames.multiplayer_sessions.transaction_received.connect(func(opponent_id: String, transactions: Array[Dictionary]) -> void:
     apply_opponent_actions(opponent_id, transactions)
 )
-YandexGames.multiplayer.session_finished.connect(func(opponent_id):
+YandexGames.multiplayer_sessions.session_finished.connect(func(opponent_id: String) -> void:
     on_opponent_finish(opponent_id)
 )
 ```

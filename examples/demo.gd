@@ -10,13 +10,15 @@ func _ready() -> void:
 	_log("[color=yellow]=== Yandex Games SDK Demo Started ===[/color]")
 	
 	# Connect signals
-	YandexGames.ads.interstitial_closed.connect(func(was_shown): _log("Interstitial Closed (Shown: %s)" % str(was_shown)))
-	YandexGames.ads.rewarded_rewarded.connect(func(): 
+	YandexGames.ads.interstitial_closed.connect(func(was_shown: bool) -> void:
+		_log("Interstitial Closed (Shown: %s)" % str(was_shown))
+	)
+	YandexGames.ads.rewarded_rewarded.connect(func() -> void: 
 		_coins += 50
 		_log("[color=green]+50 Coins rewarded! Total coins: %d[/color]" % _coins)
 		_update_ui()
 	)
-	YandexGames.player.authorized.connect(func(info):
+	YandexGames.player.authorized.connect(func(info: Dictionary) -> void:
 		_log("[color=green]Player Authorized:[/color] %s" % str(info.get("name", "Unknown")))
 		_update_ui()
 	)
@@ -29,7 +31,7 @@ func _log(text: String) -> void:
 	print(text)
 
 func _update_ui() -> void:
-	var name_str = YandexGames.player.get_name()
+	var name_str: String = YandexGames.player.get_name()
 	if name_str.is_empty():
 		name_str = "Guest / Unauthorized"
 	player_info_label.text = "Player: %s | Coins: %d | Level: %d" % [name_str, _coins, _level]
@@ -38,45 +40,45 @@ func _update_ui() -> void:
 
 func _on_btn_interstitial_pressed() -> void:
 	_log("Requesting Interstitial Ad...")
-	var res = await YandexGames.show_interstitial()
+	var res: Dictionary = await YandexGames.show_interstitial()
 	_log("Interstitial result: %s" % str(res))
 
 func _on_btn_rewarded_pressed() -> void:
 	_log("Requesting Rewarded Video Ad...")
-	var res = await YandexGames.show_rewarded()
+	var res: Dictionary = await YandexGames.show_rewarded()
 	_log("Rewarded result: %s" % str(res))
 
 func _on_btn_banner_show_pressed() -> void:
 	_log("Showing Sticky Banner...")
-	var res = await YandexGames.show_banner()
+	var res: Dictionary = await YandexGames.show_banner()
 	_log("Banner show result: %s" % str(res))
 
 func _on_btn_banner_hide_pressed() -> void:
 	_log("Hiding Sticky Banner...")
-	var res = await YandexGames.hide_banner()
+	var res: Dictionary = await YandexGames.hide_banner()
 	_log("Banner hide result: %s" % str(res))
 
 # --- Player & Saves Section ---
 
 func _on_btn_auth_dialog_pressed() -> void:
 	_log("Opening Auth Dialog...")
-	var info = await YandexGames.player.open_auth_dialog()
+	var info: Dictionary = await YandexGames.player.open_auth_dialog()
 	_log("Auth dialog result: %s" % str(info))
 	_update_ui()
 
 func _on_btn_save_cloud_pressed() -> void:
 	_log("Saving game state to Cloud...")
-	var data = {
+	var data: Dictionary = {
 		"coins": _coins,
 		"level": _level,
 		"saved_at": Time.get_datetime_string_from_system()
 	}
-	var success = await YandexGames.player.set_data(data, true)
+	var success: bool = await YandexGames.player.set_data(data, true)
 	_log("Save cloud result: %s" % ("OK" if success else "Failed"))
 
 func _on_btn_load_cloud_pressed() -> void:
 	_log("Loading game state from Cloud...")
-	var data = await YandexGames.player.get_data()
+	var data: Dictionary = await YandexGames.player.get_data()
 	_log("Loaded cloud data: %s" % str(data))
 	if data.has("coins"):
 		_coins = int(data.coins)
@@ -87,39 +89,39 @@ func _on_btn_load_cloud_pressed() -> void:
 func _on_btn_inc_stats_pressed() -> void:
 	_level += 1
 	_log("Incrementing stats in Cloud...")
-	var res = await YandexGames.player.increment_stats({ "level": 1, "played_sessions": 1 })
+	var res: Dictionary = await YandexGames.player.increment_stats({ "level": 1, "played_sessions": 1 })
 	_log("Increment stats result: %s" % str(res))
 	_update_ui()
 
 # --- Leaderboard Section ---
 
 func _on_btn_set_score_pressed() -> void:
-	var score = _coins * 10 + _level * 100
+	var score: int = _coins * 10 + _level * 100
 	_log("Submitting score %d to leaderboard 'main_leaderboard'..." % score)
-	var ok = await YandexGames.leaderboards.set_score("main_leaderboard", score)
+	var ok: bool = await YandexGames.leaderboards.set_score("main_leaderboard", score)
 	_log("Score submitted: %s" % ("OK" if ok else "Failed"))
 
 func _on_btn_get_leaderboard_pressed() -> void:
 	_log("Fetching leaderboard 'main_leaderboard' entries...")
-	var entries = await YandexGames.leaderboards.get_entries("main_leaderboard", { "quantityTop": 5 })
+	var entries: Dictionary = await YandexGames.leaderboards.get_entries("main_leaderboard", { "quantityTop": 5 })
 	_log("Leaderboard data: %s" % str(entries))
 
 # --- In-App Purchases Section ---
 
 func _on_btn_get_catalog_pressed() -> void:
 	_log("Fetching Payments Catalog...")
-	var catalog = await YandexGames.payments.get_catalog()
+	var catalog: Array[Dictionary] = await YandexGames.payments.get_catalog()
 	_log("Catalog products (%d): %s" % [catalog.size(), str(catalog)])
 
 func _on_btn_purchase_pressed() -> void:
 	_log("Attempting purchase 'coins_100'...")
-	var purchase = await YandexGames.payments.purchase("coins_100")
+	var purchase: Dictionary = await YandexGames.payments.purchase("coins_100")
 	_log("Purchase result: %s" % str(purchase))
 	if not purchase.is_empty():
 		_coins += 100
 		_update_ui()
 		# Auto consume
-		var token = purchase.get("purchaseToken", "")
+		var token: String = str(purchase.get("purchaseToken", ""))
 		if not token.is_empty():
 			await YandexGames.payments.consume_purchase(token)
 			_log("Consumed purchase token: %s" % token)
@@ -128,18 +130,18 @@ func _on_btn_purchase_pressed() -> void:
 
 func _on_btn_review_pressed() -> void:
 	_log("Checking canReview...")
-	var can_rev = await YandexGames.feedback.can_review()
+	var can_rev: Dictionary = await YandexGames.feedback.can_review()
 	_log("Can review: %s" % str(can_rev))
 	if can_rev.get("value", false):
-		var res = await YandexGames.feedback.request_review()
+		var res: Dictionary = await YandexGames.feedback.request_review()
 		_log("Review request result: %s" % str(res))
 
 func _on_btn_shortcut_pressed() -> void:
 	_log("Checking canShowPrompt for Shortcut...")
-	var can_show = await YandexGames.shortcut.can_show_prompt()
+	var can_show: bool = await YandexGames.shortcut.can_show_prompt()
 	_log("Can show shortcut: %s" % str(can_show))
 	if can_show:
-		var res = await YandexGames.shortcut.show_prompt()
+		var res: Dictionary = await YandexGames.shortcut.show_prompt()
 		_log("Shortcut prompt outcome: %s" % str(res))
 
 # --- Environment & Misc ---

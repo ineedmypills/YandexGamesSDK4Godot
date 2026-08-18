@@ -6,9 +6,9 @@ extends RefCounted
 
 signal review_requested(feedback_sent: bool)
 
-var _core = null
+var _core: Node = null
 
-func _init(core) -> void:
+func _init(core: Node) -> void:
 	_core = core
 
 ## Checks if the player is eligible to leave a review.
@@ -30,7 +30,7 @@ func request_review() -> Dictionary:
 	else:
 		res = await _core.mock_bridge.request_review()
 	
-	var data = res.get("data", {}) if res.get("success", false) else {}
-	var sent = data.get("feedbackSent", false)
+	var data: Dictionary = res.get("data", {}) if res.get("success", false) else {}
+	var sent: bool = data.get("feedbackSent", false)
 	review_requested.emit(sent)
 	return { "value": data.get("value", false), "feedback_sent": sent }

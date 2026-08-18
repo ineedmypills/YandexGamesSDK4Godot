@@ -27,14 +27,14 @@ var storage: YandexStorage
 var remote_config: YandexRemoteConfig
 var games: YandexGamesAPI
 var clipboard: YandexClipboard
-var multiplayer: YandexMultiplayer
+var multiplayer_sessions: YandexMultiplayer
 
 # Internal state
 var is_initialized: bool = false
 var mock_bridge: YandexMockBridge = null
-var _js_bridge = null
-var _js_pause_resume_cb = null
-var _ad_event_queue: Array = []
+var _js_bridge: JavaScriptObject = null
+var _js_pause_resume_cb: JavaScriptObject = null
+var _ad_event_queue: Array[Dictionary] = []
 
 func _ready() -> void:
 	# Instantiate modules
@@ -50,7 +50,7 @@ func _ready() -> void:
 	remote_config = YandexRemoteConfig.new(self)
 	games = YandexGamesAPI.new(self)
 	clipboard = YandexClipboard.new(self)
-	multiplayer = YandexMultiplayer.new(self)
+	multiplayer_sessions = YandexMultiplayer.new(self)
 
 	if not is_web():
 		mock_bridge = YandexMockBridge.new()
@@ -67,29 +67,29 @@ func _setup_web_callbacks() -> void:
 		return
 	
 	_js_pause_resume_cb = JavaScriptBridge.create_callback(_on_js_pause_resume)
-	var bridge = JavaScriptBridge.get_interface("GodotYandexBridge")
+	var bridge: JavaScriptObject = JavaScriptBridge.get_interface("GodotYandexBridge")
 	if bridge:
 		bridge.setPauseResumeCallback(_js_pause_resume_cb)
 
 func _on_js_pause_resume(args: Array) -> void:
 	if args.is_empty():
 		return
-	var json_str = str(args[0])
-	var json = JSON.new()
+	var json_str: String = str(args[0])
+	var json: JSON = JSON.new()
 	if json.parse(json_str) == OK and json.data is Dictionary:
-		var ev = json.data.get("event", "")
+		var ev: String = str(json.data.get("event", ""))
 		if ev == "pause":
 			_on_platform_pause()
 		elif ev == "resume":
 			_on_platform_resume()
 		elif ev == "multiplayer_transaction":
-			var d = json.data.get("data", {})
-			var opp_id = str(d.get("opponentId", ""))
-			var txs = d.get("transactions", [])
-			multiplayer.transaction_received.emit(opp_id, txs)
+			var d: Dictionary = json.data.get("data", {})
+			var opp_id: String = str(d.get("opponentId", ""))
+			var txs: Array = d.get("transactions", [])
+			multiplayer_sessions.transaction_received.emit(opp_id, txs)
 		elif ev == "multiplayer_finish":
-			var opp_id = str(json.data.get("opponentId", ""))
-			multiplayer.session_finished.emit(opp_id)
+			var opp_id: String = str(json.data.get("opponentId", ""))
+			multiplayer_sessions.session_finished.emit(opp_id)
 
 func _on_platform_pause() -> void:
 	if auto_mute_audio:
@@ -123,7 +123,7 @@ func init(options: Dictionary = {}) -> bool:
 
 	if res.get("success", false):
 		is_initialized = true
-		var data = res.get("data", {})
+		var data: Dictionary = res.get("data", {})
 		if data.has("environment"):
 			environment._update_env(data.environment)
 		if data.has("device"):
@@ -144,7 +144,7 @@ func init(options: Dictionary = {}) -> bool:
 ## Notifies Yandex platform that the game has finished loading assets and is ready. (Mandatory for catalog!)
 func game_ready() -> void:
 	if is_web():
-		var bridge = JavaScriptBridge.get_interface("GodotYandexBridge")
+		var bridge: JavaScriptObject = JavaScriptBridge.get_interface("GodotYandexBridge")
 		if bridge:
 			bridge.loadingReady()
 	else:
@@ -153,7 +153,7 @@ func game_ready() -> void:
 ## Marks the start or resumption of active gameplay (level start, unpause).
 func gameplay_start() -> void:
 	if is_web():
-		var bridge = JavaScriptBridge.get_interface("GodotYandexBridge")
+		var bridge: JavaScriptObject = JavaScriptBridge.get_interface("GodotYandexBridge")
 		if bridge:
 			bridge.gameplayStart()
 	else:
@@ -162,7 +162,7 @@ func gameplay_start() -> void:
 ## Marks the stop or pause of gameplay (level finished, menu opened, player died).
 func gameplay_stop() -> void:
 	if is_web():
-		var bridge = JavaScriptBridge.get_interface("GodotYandexBridge")
+		var bridge: JavaScriptObject = JavaScriptBridge.get_interface("GodotYandexBridge")
 		if bridge:
 			bridge.gameplayStop()
 	else:
@@ -171,7 +171,7 @@ func gameplay_stop() -> void:
 ## Retrieves synchronized server time in milliseconds.
 func get_server_time() -> int:
 	if is_web():
-		var bridge = JavaScriptBridge.get_interface("GodotYandexBridge")
+		var bridge: JavaScriptObject = JavaScriptBridge.get_interface("GodotYandexBridge")
 		if bridge:
 			return int(bridge.serverTime())
 		return int(Time.get_unix_time_from_system() * 1000.0)
@@ -181,7 +181,7 @@ func get_server_time() -> int:
 ## Checks whether a specific Yandex Games SDK method is supported on current platform.
 func is_available_method(method_name: String) -> bool:
 	if is_web():
-		var res = await call_js_async("isAvailableMethod", [method_name])
+		var res: Dictionary = await call_js_async("isAvailableMethod", [method_name])
 		return res.get("available", false)
 	else:
 		return mock_bridge.is_available_method(method_name)
@@ -210,18 +210,18 @@ func call_js_async(method_name: String, args: Array = []) -> Dictionary:
 	if not is_web():
 		return { "success": false, "error": "Not running in Web export" }
 	
-	var bridge = JavaScriptBridge.get_interface("GodotYandexBridge")
+	var bridge: JavaScriptObject = JavaScriptBridge.get_interface("GodotYandexBridge")
 	if not bridge:
 		return { "success": false, "error": "GodotYandexBridge JS object not found" }
 	
-	var result_holder = { "completed": false, "data": {} }
+	var result_holder: Dictionary = { "completed": false, "data": {} }
 	
-	var cb = JavaScriptBridge.create_callback(func(cb_args: Array):
-		var raw = ""
+	var cb: JavaScriptObject = JavaScriptBridge.create_callback(func(cb_args: Array) -> void:
+		var raw: String = ""
 		if not cb_args.is_empty():
 			raw = str(cb_args[0])
-		var json = JSON.new()
-		var parsed_data = {}
+		var json: JSON = JSON.new()
+		var parsed_data: Dictionary = {}
 		if json.parse(raw) == OK and json.data is Dictionary:
 			parsed_data = json.data
 		else:
@@ -232,7 +232,7 @@ func call_js_async(method_name: String, args: Array = []) -> Dictionary:
 		_ad_event_queue.append(parsed_data)
 	)
 	
-	var call_args = args.duplicate()
+	var call_args: Array = args.duplicate()
 	call_args.append(cb)
 	
 	bridge.callv(method_name, Array(call_args))

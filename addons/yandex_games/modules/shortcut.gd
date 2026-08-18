@@ -6,9 +6,9 @@ extends RefCounted
 
 signal prompt_shown(outcome: String)
 
-var _core = null
+var _core: Node = null
 
-func _init(core) -> void:
+func _init(core: Node) -> void:
 	_core = core
 
 ## Checks if shortcut installation prompt can be shown on current platform/browser.
@@ -19,7 +19,7 @@ func can_show_prompt() -> bool:
 	else:
 		res = _core.mock_bridge.can_show_prompt()
 	
-	var data = res.get("data", {}) if res.get("success", false) else {}
+	var data: Dictionary = res.get("data", {}) if res.get("success", false) else {}
 	return data.get("canShow", false)
 
 ## Shows the shortcut installation prompt to the player.
@@ -31,7 +31,7 @@ func show_prompt() -> Dictionary:
 	else:
 		res = await _core.mock_bridge.show_prompt()
 	
-	var data = res.get("data", {}) if res.get("success", false) else {}
-	var outcome = data.get("outcome", "rejected")
+	var data: Dictionary = res.get("data", {}) if res.get("success", false) else {}
+	var outcome: String = str(data.get("outcome", "rejected"))
 	prompt_shown.emit(outcome)
 	return { "outcome": outcome }

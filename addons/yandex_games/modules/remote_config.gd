@@ -6,10 +6,10 @@ extends RefCounted
 
 signal flags_loaded(flags: Dictionary)
 
-var _core = null
+var _core: Node = null
 var _flags: Dictionary = {}
 
-func _init(core) -> void:
+func _init(core: Node) -> void:
 	_core = core
 
 ## Retrieves remote configuration flags.
@@ -17,7 +17,7 @@ func _init(core) -> void:
 ## - client_features: Array of { "name": String, "value": String }
 ## - default_flags: Dictionary of default fallback key-values
 func get_flags(client_features: Array = [], default_flags: Dictionary = {}) -> Dictionary:
-	var params = {
+	var params: Dictionary = {
 		"clientFeatures": client_features,
 		"defaultFlags": default_flags
 	}
@@ -40,7 +40,7 @@ func get_flag_string(key: String, default_value: String = "") -> String:
 
 ## Returns a specific flag value as bool with fallback.
 func get_flag_bool(key: String, default_value: bool = false) -> bool:
-	var val = _flags.get(key)
+	var val: Variant = _flags.get(key)
 	if val == null:
 		return default_value
 	if val is bool:
@@ -49,7 +49,7 @@ func get_flag_bool(key: String, default_value: bool = false) -> bool:
 
 ## Returns a specific flag value as int with fallback.
 func get_flag_int(key: String, default_value: int = 0) -> int:
-	var val = _flags.get(key)
+	var val: Variant = _flags.get(key)
 	if val == null:
 		return default_value
 	return int(val)

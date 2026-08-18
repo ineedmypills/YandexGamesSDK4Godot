@@ -228,7 +228,7 @@ namespace YandexGamesSDK
 
         public static class Multiplayer
         {
-            private static GodotObject? Module => Instance?.Get("multiplayer").As<GodotObject>();
+            private static GodotObject? Module => Instance?.Get("multiplayer_sessions").As<GodotObject>();
 
             public static async Task<Array<Dictionary>> InitSessionsAsync(Dictionary options)
             {

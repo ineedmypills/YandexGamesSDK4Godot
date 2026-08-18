@@ -6,11 +6,11 @@ extends RefCounted
 
 signal score_set(leaderboard_name: String, score: int)
 signal score_failed(leaderboard_name: String, error: String)
-signal entries_loaded(leaderboard_name: String, entries: Array)
+signal entries_loaded(leaderboard_name: String, entries: Array[Dictionary])
 
-var _core = null
+var _core: Node = null
 
-func _init(core) -> void:
+func _init(core: Node) -> void:
 	_core = core
 
 ## Retrieves description and metadata of a specific leaderboard.
@@ -30,11 +30,11 @@ func set_score(leaderboard_name: String, score: int, extra_data: String = "") ->
 	else:
 		res = _core.mock_bridge.set_leaderboard_score(leaderboard_name, score, extra_data)
 	
-	var ok = res.get("success", false)
+	var ok: bool = res.get("success", false)
 	if ok:
 		score_set.emit(leaderboard_name, score)
 	else:
-		score_failed.emit(leaderboard_name, res.get("error", "Failed to set score"))
+		score_failed.emit(leaderboard_name, str(res.get("error", "Failed to set score")))
 	return ok
 
 ## Retrieves the current player's entry and rank in the given leaderboard.
@@ -55,7 +55,10 @@ func get_entries(leaderboard_name: String, options: Dictionary = {}) -> Dictiona
 	else:
 		res = _core.mock_bridge.get_leaderboard_entries(leaderboard_name, options)
 	
-	var data = res.get("data", {}) if res.get("success", false) else {}
-	var entries = data.get("entries", [])
+	var data: Dictionary = res.get("data", {}) if res.get("success", false) else {}
+	var raw_entries: Array = data.get("entries", [])
+	var entries: Array[Dictionary] = []
+	for entry: Dictionary in raw_entries:
+		entries.append(entry)
 	entries_loaded.emit(leaderboard_name, entries)
 	return data

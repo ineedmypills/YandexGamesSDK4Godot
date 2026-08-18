@@ -5,7 +5,7 @@ extends RefCounted
 ## Offline / Editor Mock Bridge for Yandex Games SDK in Godot 4.x
 ## Simulates all platform features, network delays, and local disk persistence.
 
-const MOCK_SAVE_PATH = "user://yandex_mock_data.json"
+const MOCK_SAVE_PATH: String = "user://yandex_mock_data.json"
 
 var is_initialized: bool = false
 var is_player_authorized: bool = true
@@ -16,8 +16,8 @@ var player_photo_url: String = "https://avatars.mds.yandex.net/get-yapic/0/0-0/i
 var _mock_data: Dictionary = {}
 var _mock_stats: Dictionary = {}
 var _mock_leaderboards: Dictionary = {}
-var _mock_purchases: Array = []
-var _mock_catalog: Array = [
+var _mock_purchases: Array[Dictionary] = []
+var _mock_catalog: Array[Dictionary] = [
 	{
 		"id": "coins_100",
 		"title": "100 Coins",
@@ -49,22 +49,22 @@ func _log(msg: String) -> void:
 
 func _load_mock_file() -> void:
 	if FileAccess.file_exists(MOCK_SAVE_PATH):
-		var file = FileAccess.open(MOCK_SAVE_PATH, FileAccess.READ)
+		var file: FileAccess = FileAccess.open(MOCK_SAVE_PATH, FileAccess.READ)
 		if file:
-			var json_str = file.get_as_text()
-			var json = JSON.new()
+			var json_str: String = file.get_as_text()
+			var json: JSON = JSON.new()
 			if json.parse(json_str) == OK and json.data is Dictionary:
 				_mock_data = json.data.get("data", {})
 				_mock_stats = json.data.get("stats", {})
 				_mock_leaderboards = json.data.get("leaderboards", {})
-				_mock_purchases = json.data.get("purchases", [])
+				_mock_purchases = Array(json.data.get("purchases", []), TYPE_DICTIONARY, &"", null)
 				_reviewed = json.data.get("reviewed", false)
 				_shortcut_installed = json.data.get("shortcut_installed", false)
 
 func _save_mock_file() -> void:
-	var file = FileAccess.open(MOCK_SAVE_PATH, FileAccess.WRITE)
+	var file: FileAccess = FileAccess.open(MOCK_SAVE_PATH, FileAccess.WRITE)
 	if file:
-		var save_dict = {
+		var save_dict: Dictionary = {
 			"data": _mock_data,
 			"stats": _mock_stats,
 			"leaderboards": _mock_leaderboards,
@@ -115,8 +115,8 @@ func get_environment() -> Dictionary:
 	}
 
 func get_device_info() -> Dictionary:
-	var os_name = OS.get_name().to_lower()
-	var is_mob = (os_name == "android" or os_name == "ios")
+	var os_name: String = OS.get_name().to_lower()
+	var is_mob: bool = (os_name == "android" or os_name == "ios")
 	return {
 		"type": "mobile" if is_mob else "desktop",
 		"isMobile": is_mob,
@@ -145,7 +145,7 @@ func show_fullscreen_adv(callback: Callable) -> void:
 	callback.call({ "event": "open" })
 	
 	# Simulate 0.5s ad playback in editor
-	var tree = Engine.get_main_loop() as SceneTree
+	var tree: SceneTree = Engine.get_main_loop() as SceneTree
 	if tree:
 		await tree.create_timer(0.5).timeout
 	
@@ -156,7 +156,7 @@ func show_rewarded_video(callback: Callable) -> void:
 	_log("Rewarded Video Ad: Opening...")
 	callback.call({ "event": "open" })
 	
-	var tree = Engine.get_main_loop() as SceneTree
+	var tree: SceneTree = Engine.get_main_loop() as SceneTree
 	if tree:
 		await tree.create_timer(0.8).timeout
 	
@@ -198,7 +198,7 @@ func init_player(_options: Dictionary = {}) -> Dictionary:
 
 func open_auth_dialog() -> Dictionary:
 	_log("Simulating player authorization dialog...")
-	var tree = Engine.get_main_loop() as SceneTree
+	var tree: SceneTree = Engine.get_main_loop() as SceneTree
 	if tree:
 		await tree.create_timer(0.3).timeout
 	is_player_authorized = true
@@ -210,19 +210,21 @@ func get_player_data(keys: Variant = null) -> Dictionary:
 	if keys == null:
 		return { "success": true, "data": _mock_data.duplicate(true) }
 	
-	var result = {}
+	var result: Dictionary = {}
 	if keys is Array:
-		for k in keys:
-			if _mock_data.has(k):
-				result[k] = _mock_data[k]
+		for k: Variant in keys:
+			var k_str: String = str(k)
+			if _mock_data.has(k_str):
+				result[k_str] = _mock_data[k_str]
 	elif keys is String:
 		if _mock_data.has(keys):
 			result[keys] = _mock_data[keys]
 	return { "success": true, "data": result }
 
 func set_player_data(data: Dictionary, _flush: bool = false) -> Dictionary:
-	for k in data.keys():
-		_mock_data[k] = data[k]
+	for k: Variant in data.keys():
+		var k_str: String = str(k)
+		_mock_data[k_str] = data[k]
 	_save_mock_file()
 	_log("setPlayerData() -> saved %d keys to %s" % [data.size(), MOCK_SAVE_PATH])
 	return { "success": true }
@@ -230,36 +232,37 @@ func set_player_data(data: Dictionary, _flush: bool = false) -> Dictionary:
 func get_player_stats(keys: Variant = null) -> Dictionary:
 	if keys == null:
 		return { "success": true, "data": _mock_stats.duplicate(true) }
-	var result = {}
+	var result: Dictionary = {}
 	if keys is Array:
-		for k in keys:
-			if _mock_stats.has(k):
-				result[k] = _mock_stats[k]
+		for k: Variant in keys:
+			var k_str: String = str(k)
+			if _mock_stats.has(k_str):
+				result[k_str] = _mock_stats[k_str]
 	return { "success": true, "data": result }
 
 func set_player_stats(stats: Dictionary) -> Dictionary:
-	for k in stats.keys():
-		_mock_stats[k] = stats[k]
+	for k: Variant in stats.keys():
+		var k_str: String = str(k)
+		_mock_stats[k_str] = stats[k]
 	_save_mock_file()
 	_log("setPlayerStats() -> %s" % str(stats))
 	return { "success": true }
 
 func increment_player_stats(increments: Dictionary) -> Dictionary:
-	for k in increments.keys():
-		var val = _mock_stats.get(k, 0)
-		_mock_stats[k] = val + increments[k]
+	for k: Variant in increments.keys():
+		var k_str: String = str(k)
+		var val: Variant = _mock_stats.get(k_str, 0)
+		_mock_stats[k_str] = val + increments[k]
 	_save_mock_file()
 	_log("incrementPlayerStats() -> %s" % str(_mock_stats))
 	return { "success": true, "data": _mock_stats.duplicate(true) }
 
-func get_player_ids_per_game() -> Dictionary:
-	return {
-		"success": true,
-		"data": [
-			{ "appID": "mock_app_1", "userID": "mock_user_1" },
-			{ "appID": "mock_app_2", "userID": "mock_user_2" }
-		]
-	}
+func get_player_ids_per_game() -> Array[Dictionary]:
+	var list: Array[Dictionary] = [
+		{ "appID": "mock_app_1", "userID": "mock_user_1" },
+		{ "appID": "mock_app_2", "userID": "mock_user_2" }
+	]
+	return list
 
 # --- Leaderboards ---
 
@@ -279,8 +282,8 @@ func set_leaderboard_score(name: String, score: int, extra_data: String = "") ->
 		_mock_leaderboards[name] = []
 	
 	var list: Array = _mock_leaderboards[name]
-	var found = false
-	for entry in list:
+	var found: bool = false
+	for entry: Dictionary in list:
 		if entry.get("player", {}).get("uniqueID") == player_unique_id:
 			entry["score"] = score
 			entry["extraData"] = extra_data
@@ -300,8 +303,10 @@ func set_leaderboard_score(name: String, score: int, extra_data: String = "") ->
 		})
 	
 	# Sort descending by score
-	list.sort_custom(func(a, b): return a.score > b.score)
-	for i in range(list.size()):
+	list.sort_custom(func(a: Dictionary, b: Dictionary) -> bool:
+		return int(a.get("score", 0)) > int(b.get("score", 0))
+	)
+	for i: int in range(list.size()):
 		list[i]["rank"] = i + 1
 	
 	_save_mock_file()
@@ -310,7 +315,7 @@ func set_leaderboard_score(name: String, score: int, extra_data: String = "") ->
 
 func get_leaderboard_player_entry(name: String) -> Dictionary:
 	var list: Array = _mock_leaderboards.get(name, [])
-	for entry in list:
+	for entry: Dictionary in list:
 		if entry.get("player", {}).get("uniqueID") == player_unique_id:
 			return { "success": true, "data": entry }
 	return {
@@ -323,11 +328,11 @@ func get_leaderboard_player_entry(name: String) -> Dictionary:
 		}
 	}
 
-func get_leaderboard_entries(name: String, options: Dictionary = {}) -> Dictionary:
+func get_leaderboard_entries(name: String, _options: Dictionary = {}) -> Dictionary:
 	var list: Array = _mock_leaderboards.get(name, [])
 	if list.is_empty():
 		# Generate sample entries for editor testing
-		for i in range(1, 6):
+		for i: int in range(1, 6):
 			list.append({
 				"score": 1000 - i * 150,
 				"rank": i,
@@ -351,16 +356,16 @@ func get_leaderboard_entries(name: String, options: Dictionary = {}) -> Dictiona
 
 # --- Payments ---
 
-func get_catalog() -> Dictionary:
-	return { "success": true, "data": _mock_catalog }
+func get_catalog() -> Array[Dictionary]:
+	return _mock_catalog
 
-func get_purchases() -> Dictionary:
-	return { "success": true, "data": _mock_purchases }
+func get_purchases() -> Array[Dictionary]:
+	return _mock_purchases
 
 func purchase(options: Dictionary) -> Dictionary:
-	var product_id = options.get("id", "")
-	var token = "mock_token_" + str(Time.get_ticks_msec())
-	var purchase_entry = {
+	var product_id: String = str(options.get("id", ""))
+	var token: String = "mock_token_" + str(Time.get_ticks_msec())
+	var purchase_entry: Dictionary = {
 		"productID": product_id,
 		"purchaseToken": token,
 		"developerPayload": options.get("developerPayload", "")
@@ -371,8 +376,8 @@ func purchase(options: Dictionary) -> Dictionary:
 	return { "success": true, "data": purchase_entry }
 
 func consume_purchase(token: String) -> Dictionary:
-	var index_to_remove = -1
-	for i in range(_mock_purchases.size()):
+	var index_to_remove: int = -1
+	for i: int in range(_mock_purchases.size()):
 		if _mock_purchases[i].get("purchaseToken") == token:
 			index_to_remove = i
 			break
@@ -419,20 +424,18 @@ func show_prompt() -> Dictionary:
 # --- Remote Config / Flags ---
 
 func get_flags(params: Dictionary = {}) -> Dictionary:
-	var defaults = params.get("defaultFlags", {})
+	var defaults: Dictionary = params.get("defaultFlags", {})
 	_log("getFlags() -> returning defaults: %s" % str(defaults))
 	return { "success": true, "data": defaults }
 
 # --- Cross-Promotion / Games ---
 
-func get_all_games() -> Dictionary:
-	return {
-		"success": true,
-		"data": [
-			{ "appID": "mock_game_1", "title": "Example Game 1", "url": "https://yandex.ru/games" },
-			{ "appID": "mock_game_2", "title": "Example Game 2", "url": "https://yandex.ru/games" }
-		]
-	}
+func get_all_games() -> Array[Dictionary]:
+	var list: Array[Dictionary] = [
+		{ "appID": "mock_game_1", "title": "Example Game 1", "url": "https://yandex.ru/games" },
+		{ "appID": "mock_game_2", "title": "Example Game 2", "url": "https://yandex.ru/games" }
+	]
+	return list
 
 func get_game_by_id(app_id: String) -> Dictionary:
 	return {
@@ -449,11 +452,11 @@ func clipboard_write_text(text: String) -> Dictionary:
 
 # --- Multiplayer Sessions ---
 
-func multiplayer_init_sessions(options: Dictionary) -> Dictionary:
-	var count = options.get("count", 1)
+func multiplayer_init_sessions(options: Dictionary) -> Array[Dictionary]:
+	var count: int = int(options.get("count", 1))
 	_log("Multiplayer sessions initialized (count: %d)" % count)
-	var sample_opponents = []
-	for i in range(count):
+	var sample_opponents: Array[Dictionary] = []
+	for i: int in range(count):
 		sample_opponents.append({
 			"id": "mock_session_%d" % (i + 1),
 			"meta": { "meta1": 100 * (i + 1), "meta2": i + 1, "meta3": 0 },
@@ -463,7 +466,7 @@ func multiplayer_init_sessions(options: Dictionary) -> Dictionary:
 				{ "id": "2", "time": 500, "payload": { "action": "move", "x": 10, "y": 20 } }
 			]
 		})
-	return { "success": true, "data": sample_opponents }
+	return sample_opponents
 
 func multiplayer_commit(payload: Dictionary) -> void:
 	_log("Multiplayer transaction committed: %s" % str(payload))
@@ -471,3 +474,4 @@ func multiplayer_commit(payload: Dictionary) -> void:
 func multiplayer_push(meta: Dictionary) -> Dictionary:
 	_log("Multiplayer session pushed to server (meta: %s)" % str(meta))
 	return { "success": true }
+
