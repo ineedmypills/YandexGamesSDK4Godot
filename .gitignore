@@ -18,4 +18,5 @@ Thumbs.db
 # Export / Build artifacts
 export/
 builds/
+*.zip
 yandex_mock_data.json
