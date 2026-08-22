@@ -42,6 +42,8 @@ jobs:
           test -f addons/yandex_games/bridge/yandex_bridge.js || exit 1
           test -f addons/yandex_games/mock/mock_bridge.gd || exit 1
           test -f addons/yandex_games/templates/yandex_template.html || exit 1
+          test -f addons/yandex_games/LICENSE.md || exit 1
+          test -f addons/yandex_games/README.md || exit 1
           echo "Addon structure verified successfully."
 
   release:
@@ -57,7 +59,7 @@ jobs:
       - name: Package Addon Archive
         run: |
           ZIP_NAME="yandex-games-sdk-${{ github.ref_name }}.zip"
-          zip -r "$ZIP_NAME" addons README.md LICENSE icon.png examples project.godot
+          zip -r "$ZIP_NAME" addons
           ls -lh "$ZIP_NAME"
 
       - name: Upload Asset to GitHub Release

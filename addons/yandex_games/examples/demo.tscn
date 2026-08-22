@@ -1,6 +1,6 @@
 [gd_scene load_steps=2 format=3 uid="uid://b8yandexgamesdemo"]
 
-[ext_resource type="Script" path="res://examples/demo.gd" id="1_demo"]
+[ext_resource type="Script" path="res://addons/yandex_games/examples/demo.gd" id="1_demo"]
 
 [node name="Demo" type="Control"]
 layout_mode = 3

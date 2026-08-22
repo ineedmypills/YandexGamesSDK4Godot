@@ -9,9 +9,9 @@ config_version=5
 config/name="Yandex Games SDK 4 Godot"
 config/description="Yandex Games SDK plugin for Godot 4.x"
 config/version="1.1.0"
-run/main_scene="res://examples/demo.tscn"
+run/main_scene="res://addons/yandex_games/examples/demo.tscn"
 config/features=PackedStringArray("4.3", "Forward Plus")
-config/icon="res://icon.svg"
+config/icon="res://addons/yandex_games/icon.svg"
 
 [autoload]
 

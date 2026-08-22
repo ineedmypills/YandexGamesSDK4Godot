@@ -1,0 +1,11 @@
+# Exclude non-addon development and project files from git archive / GitHub source downloads
+/.github export-ignore
+/.gitignore export-ignore
+/.gitattributes export-ignore
+/LICENSE export-ignore
+/README.md export-ignore
+/project.godot export-ignore
+/tests export-ignore
+/*.csproj export-ignore
+/*.slnx export-ignore
+/*.sln export-ignore
