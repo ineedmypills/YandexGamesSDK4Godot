@@ -10,6 +10,7 @@
 </p>
 
 <p align="center">
+  <a href="https://store.godotengine.org/asset/ineedmypills/yandex-games-sdk-for-godot-4/"><img src="https://img.shields.io/badge/Godot%20Asset%20Library-Available-478cbf?logo=godotengine&logoColor=white" alt="Godot Asset Library"></a>
   <a href="https://godotengine.org/"><img src="https://img.shields.io/badge/Godot-4.3+-478cbf?logo=godotengine&logoColor=white" alt="Godot 4.3+"></a>
   <a href="https://dotnet.microsoft.com/"><img src="https://img.shields.io/badge/.NET-8.0-512bd4?logo=dotnet&logoColor=white" alt=".NET 8"></a>
   <a href="https://yandex.ru/dev/games/doc/ru/"><img src="https://img.shields.io/badge/Yandex%20Games-SDK-6b51ff" alt="Yandex Games SDK"></a>
@@ -91,9 +92,10 @@ The plugin uses a unified API layer that automatically delegates calls based on 
 ## Installation
 
 ### Method 1: Godot Asset Library
+Install directly from the **[Godot Asset Library](https://store.godotengine.org/asset/ineedmypills/yandex-games-sdk-for-godot-4/)** or via the editor:
 1. Open your project in Godot 4.
-2. Navigate to the **AssetLib** tab.
-3. Search for **Yandex Games SDK**.
+2. Navigate to the **AssetLib** tab at the top.
+3. Search for **Yandex Games SDK** (or view it on the [Godot Asset Store](https://store.godotengine.org/asset/ineedmypills/yandex-games-sdk-for-godot-4/)).
 4. Click **Download** and **Install**.
 5. Go to **Project -> Project Settings -> Plugins** and enable **Yandex Games SDK**.
 
