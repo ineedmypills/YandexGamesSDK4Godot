@@ -62,12 +62,26 @@ func _ready() -> void:
 func is_web() -> bool:
 	return OS.has_feature("web") and ClassDB.class_exists("JavaScriptBridge")
 
+func _get_bridge(timeout_frames: int = 180) -> JavaScriptObject:
+	if not is_web():
+		return null
+	var bridge: JavaScriptObject = JavaScriptBridge.get_interface("GodotYandexBridge")
+	var frames_waited: int = 0
+	while bridge == null and frames_waited < timeout_frames:
+		await get_tree().process_frame
+		frames_waited += 1
+		bridge = JavaScriptBridge.get_interface("GodotYandexBridge")
+
+	if bridge == null:
+		push_error("[YandexGames] GodotYandexBridge JS object not found on window after waiting. Ensure 'Custom HTML Shell' in Web Export is set to 'res://addons/yandex_games/templates/yandex_template.html'.")
+	return bridge
+
 func _setup_web_callbacks() -> void:
 	if not is_web():
 		return
 	
 	_js_pause_resume_cb = JavaScriptBridge.create_callback(_on_js_pause_resume)
-	var bridge: JavaScriptObject = JavaScriptBridge.get_interface("GodotYandexBridge")
+	var bridge: JavaScriptObject = await _get_bridge(60)
 	if bridge:
 		bridge.setPauseResumeCallback(_js_pause_resume_cb)
 
@@ -210,9 +224,9 @@ func call_js_async(method_name: String, args: Array = []) -> Dictionary:
 	if not is_web():
 		return { "success": false, "error": "Not running in Web export" }
 	
-	var bridge: JavaScriptObject = JavaScriptBridge.get_interface("GodotYandexBridge")
+	var bridge: JavaScriptObject = await _get_bridge(180)
 	if not bridge:
-		return { "success": false, "error": "GodotYandexBridge JS object not found" }
+		return { "success": false, "error": "GodotYandexBridge JS object not found. Check Web Export custom HTML shell template." }
 	
 	var result_holder: Dictionary = { "completed": false, "data": {} }
 	

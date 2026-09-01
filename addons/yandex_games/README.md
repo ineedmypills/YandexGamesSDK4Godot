@@ -507,6 +507,64 @@ Once the preset is ready:
 
 ---
 
+
+
+---
+
+## Частые вопросы и FAQ (Troubleshooting)
+
+### ❓ 1. Почему после просмотра рекламы (Rewarded Video) не начисляется награда на реальном сервере Яндекса?
+**Причина и решение:**
+- В Web-версии Яндекса callback `onRewarded` может вызываться платформой одновременно или с минимальной задержкой относительно `onClose` (в том же микротаске JS).
+- Наш SDK полностью обрабатывает этот сценарий:
+  1. Вы можете использовать метод `var res = await YandexGames.show_rewarded()`. В нем возвращается словарь с ключом `res.get("rewarded", false)`.
+  2. Также вы можете подписаться на сигнал `YandexGames.ads.rewarded_rewarded.connect(_on_reward)`.
+  *Оба способа синхронизированы и одинаково надежны!*
+
+Пример корректного вызова:
+```gdscript
+func _on_reward_button_pressed() -> void:
+    var res: Dictionary = await YandexGames.show_rewarded()
+    if res.get("rewarded", false):
+        _grant_reward()
+    else:
+        print("Игрок закрыл рекламу до завершения или произошла ошибка:", res.get("error", ""))
+```
+
+---
+
+### ❓ 2. Почему при вызове `init()` на первом кадре (`_ready()`) может возникнуть ошибка или мост доступен как `Nil`?
+**Причина и решение:**
+- В Web-экспорте загрузка HTML-страницы и JS-моста `GodotYandexBridge` происходит параллельно с инициализацией движка Godot. На первом кадре скрипт моста может еще не успеть заинжектиться в `window`.
+- Начиная с текущей версии, SDK включает встроенный механизм мягкого ожидания (Defensive Polling). `init()` автоматически дождется готовности моста.
+- Убедитесь, что в настройках Web-экспорта выбран шаблон `yandex_template.html` (**Custom HTML Shell**).
+
+Рекомендуемый шаблон инициализации в `Autoload` (например, `GameManager.gd`):
+```gdscript
+func _ready() -> void:
+    await get_tree().process_frame
+
+    if get_node_or_null("/root/YandexGames") != null:
+        # Автоматически ожидает мост и выполняет инициализацию
+        var success: bool = await YandexGames.init()
+        if success:
+            print("Yandex SDK успешно инициализирован!")
+            YandexGames.gameplay_start()
+```
+
+---
+
+### ❓ 3. На GitHub написано, что есть изменения в `md`, но я не заметил разницы — что изменилось?
+- В репозитории были обновлены руководства по настройке автоматического Web-экспорта, улучшена работа с рекламой на мобильных устройствах, а также добавлена документация по C# (.NET 8) и подпискам на сигналы.
+
+---
+
+### ❓ 4. Нужно ли слушать сигналы рекламы отдельно от `await`?
+- **Не обязательно.** Вы можете использовать тот подход, который удобнее для архитектуры вашей игры.
+- Если вам привычнее линейный асинхронный код — используйте `await YandexGames.show_rewarded()`.
+- Если вы строите архитектуру на событиях — подписывайтесь на сигналы `YandexGames.ads.rewarded_opened`, `YandexGames.ads.rewarded_rewarded`, `YandexGames.ads.rewarded_closed`.
+
+---
 ## Editor Mock Mode
 
 When testing within the Godot Editor (F5) or running desktop builds, the plugin switches to `YandexMockBridge`:
