@@ -486,12 +486,18 @@ public partial class GameManager : Node
 ## Web Export & Yandex Console Checklist
 
 ### 1. Godot Export Preset
-1. In Godot, navigate to **Project -> Export**.
-2. Click **Add...** and select **Web**.
-3. In the export settings under **Options -> Custom HTML Shell**, select:
-   `res://addons/yandex_games/templates/yandex_template.html`
-4. Ensure **Export Type** is set to `Regular` (or `Threads` if your project requires multithreading).
-5. Click **Export Project** and save the `.zip` archive.
+
+When you enable the plugin, a **"Web (Yandex Games)"** export preset is created automatically in `export_presets.cfg` — including the correct **Custom HTML Shell** pointing to `yandex_template.html`. Nothing to configure manually.
+
+**If you already had a Web preset before installing this plugin**, open **Project → Export**, select your preset, and set **Options → Custom HTML Shell** to:
+```
+res://addons/yandex_games/templates/yandex_template.html
+```
+The export window will show a warning banner until this is set correctly.
+
+Once the preset is ready:
+1. Set **Export Type** to `Regular` (or `Threads` if your project requires multithreading).
+2. Click **Export Project** and save the `.zip` archive.
 
 ### 2. Yandex Developer Console Requirements
 - [x] `YandexGames.game_ready()` called after initial assets are loaded.

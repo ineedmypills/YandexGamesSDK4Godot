@@ -79,7 +79,7 @@ func show_rewarded() -> Dictionary:
 		var cb_data: Dictionary = await _core.call_js_async("showRewardedVideo")
 		var event: String = str(cb_data.get("event", ""))
 		var got_reward: bool = false
-		
+
 		while event != "close" and event != "error":
 			if event == "open":
 				rewarded_opened.emit()
@@ -88,7 +88,15 @@ func show_rewarded() -> Dictionary:
 				rewarded_rewarded.emit()
 			cb_data = await _core._wait_for_next_ad_event()
 			event = str(cb_data.get("event", ""))
-		
+
+		await _core.get_tree().process_frame
+		while not _core._ad_event_queue.is_empty():
+			var late: Dictionary = _core._ad_event_queue.pop_front()
+			var late_event: String = str(late.get("event", ""))
+			if late_event == "rewarded" and not got_reward:
+				got_reward = true
+				rewarded_rewarded.emit()
+
 		if event == "close":
 			var was_shown: bool = cb_data.get("wasShown", false)
 			rewarded_closed.emit(was_shown)
@@ -99,6 +107,7 @@ func show_rewarded() -> Dictionary:
 			var err: String = str(cb_data.get("error", "Rewarded ad error"))
 			rewarded_failed.emit(err)
 			result.error = err
+
 	else:
 		# Mock mode
 		var state: Dictionary = { "got_reward": false }

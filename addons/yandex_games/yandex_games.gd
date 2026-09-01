@@ -226,10 +226,12 @@ func call_js_async(method_name: String, args: Array = []) -> Dictionary:
 			parsed_data = json.data
 		else:
 			parsed_data = { "success": true, "raw": raw }
-		
-		result_holder.data = parsed_data
-		result_holder.completed = true
-		_ad_event_queue.append(parsed_data)
+
+		if result_holder.completed:
+			_ad_event_queue.append(parsed_data)
+		else:
+			result_holder.data = parsed_data
+			result_holder.completed = true
 	)
 	
 	var call_args: Array = args.duplicate()
