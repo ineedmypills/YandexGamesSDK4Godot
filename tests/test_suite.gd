@@ -44,6 +44,8 @@ func _run_tests() -> void:
 	_assert(yg.environment.get_tld() == "ru", "Environment: get_tld() == 'ru'")
 	_assert(yg.environment.get_browser_lang() == "ru", "Environment: get_browser_lang() == 'ru'")
 	_assert(yg.environment.get_all() is Dictionary, "Environment: get_all() is Dictionary")
+	_assert(typeof(yg.environment.has_promo()) == TYPE_BOOL, "Environment: has_promo() is bool")
+	_assert(yg.environment.get_referrer() is Dictionary, "Environment: get_referrer() is Dictionary")
 	
 	# 4. Device
 	_assert(yg.device.get_type() in ["desktop", "mobile", "tablet", "tv"], "Device: get_type() is valid")
@@ -52,6 +54,8 @@ func _run_tests() -> void:
 	_assert(typeof(yg.device.is_fullscreen()) == TYPE_BOOL, "Device: is_fullscreen() is bool")
 	_assert(yg.device.request_fullscreen(), "Device: request_fullscreen() == true")
 	_assert(yg.device.exit_fullscreen(), "Device: exit_fullscreen() == true")
+	_assert(yg.device.get_orientation() != "", "Device: get_orientation() is non-empty")
+	_assert(yg.device.set_orientation("portrait"), "Device: set_orientation() returns true")
 	
 	# 5. Player & Auth
 	_assert(yg.player.is_authorized(), "Player: is_authorized() in mock mode == true")
@@ -95,10 +99,12 @@ func _run_tests() -> void:
 	_assert(desc.get("name") == "test_lb", "Leaderboards: get_description() name matches")
 	var set_score_ok: bool = yg.leaderboards.set_score("test_lb", 9999, "extra_info")
 	_assert(set_score_ok, "Leaderboards: set_score() returns true")
+	yg.leaderboards.set_score_debounced("test_lb", 12000, "extra_info")
 	var player_entry: Dictionary = yg.leaderboards.get_player_entry("test_lb")
 	_assert(player_entry.get("score") == 9999, "Leaderboards: get_player_entry() score == 9999")
 	var entries: Dictionary = yg.leaderboards.get_entries("test_lb", { "quantityTop": 5 })
 	_assert(entries.get("entries", []).size() > 0, "Leaderboards: get_entries() has entries")
+	_assert(typeof(yg.is_platform_paused) == TYPE_BOOL, "Core: is_platform_paused is bool")
 	
 	# 9. Payments
 	var catalog: Array[Dictionary] = yg.payments.get_catalog()
@@ -138,8 +144,10 @@ func _run_tests() -> void:
 	_assert(yg.remote_config.get_flag_bool("audio_on") == true, "RemoteConfig: get_flag_bool('audio_on') == true")
 	
 	# 14. Games
-	var games_list: Array[Dictionary] = yg.games.get_all_games()
-	_assert(games_list.size() > 0, "Games: get_all_games() has entries")
+	var all_games: Dictionary = yg.games.get_all_games()
+	_assert(all_games.has("developerURL"), "Games: get_all_games() has developerURL")
+	var games_list: Array[Dictionary] = yg.games.get_games_list()
+	_assert(games_list.size() > 0, "Games: get_games_list() has entries")
 	var game_info: Dictionary = yg.games.get_game_by_id("mock_game_1")
 	_assert(game_info.get("appID") == "mock_game_1", "Games: get_game_by_id() appID matches")
 	
@@ -153,6 +161,48 @@ func _run_tests() -> void:
 	yg.multiplayer_sessions.commit({ "action": "jump", "x": 10.0 })
 	var push_ok: bool = yg.multiplayer_sessions.push({ "score": 100 })
 	_assert(push_ok, "Multiplayer: push() returns true")
+	
+	# 17. Ad Cooldown & Banner State
+	_assert(yg.ads.can_show_interstitial() == false, "Ads: can_show_interstitial() is false right after ad")
+	_assert(yg.ads.get_time_until_next_interstitial() > 0.0, "Ads: get_time_until_next_interstitial() > 0")
+	var blocked_ad: Dictionary = yg.ads.show_interstitial_if_available()
+	_assert(blocked_ad.get("success", true) == false, "Ads: show_interstitial_if_available() blocked by cooldown")
+	_assert(yg.ads.is_banner_showing == false, "Ads: is_banner_showing is false after hide")
+
+	# 18. Avatar Texture Loader & Offline Generator
+	var p_avatar: Texture2D = await yg.player.get_avatar_texture("medium")
+	_assert(p_avatar != null and p_avatar.get_width() > 0, "Player: get_avatar_texture() returned valid texture")
+	var lb_avatar: Texture2D = await yg.leaderboards.load_avatar_texture("https://mock-avatar.net/test.png", "Alex")
+	_assert(lb_avatar != null and lb_avatar.get_height() > 0, "Leaderboards: load_avatar_texture() returned valid texture")
+
+	# 19. Payments Unconsumed Purchases & Price Formatter
+	var unconsumed: Array[Dictionary] = await yg.payments.check_unconsumed_purchases()
+	_assert(unconsumed is Array, "Payments: check_unconsumed_purchases() returns Array")
+	var formatted_price: String = yg.payments.get_price_formatted({ "price": "150 YAN" })
+	_assert(formatted_price == "150 YAN", "Payments: get_price_formatted() matches")
+
+	# 20. UI Helper Nodes
+	var banner_container: YandexBannerContainer = YandexBannerContainer.new()
+	root.add_child(banner_container)
+	banner_container.editor_preview_banner = true
+	_assert(banner_container.get_theme_constant("margin_bottom") == banner_container.banner_height_pixels, "UI: YandexBannerContainer offsets margin")
+	banner_container.queue_free()
+
+	var rev_btn: YandexReviewButton = YandexReviewButton.new()
+	root.add_child(rev_btn)
+	var can_rev_btn: bool = await rev_btn.check_eligibility()
+	_assert(typeof(can_rev_btn) == TYPE_BOOL, "UI: YandexReviewButton check_eligibility returns bool")
+	rev_btn.queue_free()
+
+	var sc_btn: YandexShortcutButton = YandexShortcutButton.new()
+	root.add_child(sc_btn)
+	var can_sc_btn: bool = await sc_btn.check_eligibility()
+	_assert(typeof(can_sc_btn) == TYPE_BOOL, "UI: YandexShortcutButton check_eligibility returns bool")
+	sc_btn.queue_free()
+
+	# 21. Export Preset Configuration Tool
+	var preset_res: Dictionary = YandexGamesExportPlugin.configure_web_presets("res://export_presets.cfg")
+	_assert(preset_res.get("success", false) == true, "Export: configure_web_presets() success")
 	
 	print("\n==========================================")
 	print("  TEST RESULTS: PASS: %d, FAIL: %d" % [_pass_count, _fail_count])

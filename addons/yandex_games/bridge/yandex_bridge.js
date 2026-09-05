@@ -22,6 +22,7 @@
             try {
                 const options = optionsJson ? JSON.parse(optionsJson) : {};
                 if (typeof YaGames === 'undefined') {
+                    console.warn("[GodotYandexBridge] YaGames SDK script is not loaded in window. If testing locally, launch with @yandex-games/sdk-dev-proxy or test in Godot Editor mock mode. See: https://yandex.com/dev/games/doc/en/concepts/local-launch");
                     throw new Error("YaGames SDK script is not loaded in window.");
                 }
 
@@ -40,6 +41,31 @@
                             this.pauseResumeCallback(JSON.stringify({ event: 'resume' }));
                         }
                     });
+
+                    // SDK Events (TV back navigation & account selection)
+                    if (this.ysdk.EVENTS) {
+                        if (this.ysdk.EVENTS.HISTORY_BACK) {
+                            this.ysdk.on(this.ysdk.EVENTS.HISTORY_BACK, () => {
+                                if (this.pauseResumeCallback) {
+                                    this.pauseResumeCallback(JSON.stringify({ event: 'history_back' }));
+                                }
+                            });
+                        }
+                        if (this.ysdk.EVENTS.ACCOUNT_SELECTION_DIALOG_OPENED) {
+                            this.ysdk.on(this.ysdk.EVENTS.ACCOUNT_SELECTION_DIALOG_OPENED, () => {
+                                if (this.pauseResumeCallback) {
+                                    this.pauseResumeCallback(JSON.stringify({ event: 'account_selection_opened' }));
+                                }
+                            });
+                        }
+                        if (this.ysdk.EVENTS.ACCOUNT_SELECTION_DIALOG_CLOSED) {
+                            this.ysdk.on(this.ysdk.EVENTS.ACCOUNT_SELECTION_DIALOG_CLOSED, () => {
+                                if (this.pauseResumeCallback) {
+                                    this.pauseResumeCallback(JSON.stringify({ event: 'account_selection_closed' }));
+                                }
+                            });
+                        }
+                    }
                 }
 
                 const env = this.getEnvironment();
@@ -115,7 +141,8 @@
                 browser: env.browser || { lang: navigator.language || 'ru' },
                 i18n: env.i18n || { lang: 'ru', tld: 'ru' },
                 payload: env.payload || '',
-                fullscreen: !!(env.screen && env.screen.fullscreen)
+                fullscreen: !!(env.screen && env.screen.fullscreen),
+                referrer: env.referrer || null
             };
         },
 
@@ -139,7 +166,7 @@
             };
         },
 
-        // --- Screen & Fullscreen ---
+        // --- Screen, Fullscreen & Orientation ---
         fullscreenStatus() {
             try {
                 return !!(this.ysdk && this.ysdk.screen && this.ysdk.screen.fullscreen && this.ysdk.screen.fullscreen.status === 'on');
@@ -171,6 +198,30 @@
                 }
             } catch (err) {
                 callback(JSON.stringify({ success: false, error: err.message || String(err) }));
+            }
+        },
+
+        screenOrientationGet() {
+            try {
+                if (this.ysdk && this.ysdk.screen && this.ysdk.screen.orientation && typeof this.ysdk.screen.orientation.get === 'function') {
+                    return this.ysdk.screen.orientation.get();
+                }
+                return window.innerWidth > window.innerHeight ? 'landscape' : 'portrait';
+            } catch (e) {
+                return 'landscape';
+            }
+        },
+
+        screenOrientationSet(value, callback) {
+            try {
+                if (this.ysdk && this.ysdk.screen && this.ysdk.screen.orientation && typeof this.ysdk.screen.orientation.set === 'function') {
+                    this.ysdk.screen.orientation.set(value);
+                    if (callback) callback(JSON.stringify({ success: true, orientation: value }));
+                } else {
+                    if (callback) callback(JSON.stringify({ success: false, error: 'screen.orientation.set not supported' }));
+                }
+            } catch (err) {
+                if (callback) callback(JSON.stringify({ success: false, error: err.message || String(err) }));
             }
         },
 
@@ -392,7 +443,9 @@
         async getLeaderboardDescription(name, callback) {
             try {
                 const lb = await this.getLeaderboardsInstance();
-                const desc = await lb.getLeaderboardDescription(name);
+                const fn = lb.getDescription || lb.getLeaderboardDescription;
+                if (!fn) throw new Error("Leaderboard getDescription method not found");
+                const desc = await fn.call(lb, name);
                 callback(JSON.stringify({ success: true, data: desc }));
             } catch (err) {
                 callback(JSON.stringify({ success: false, error: err.message || String(err) }));
@@ -402,7 +455,9 @@
         async setLeaderboardScore(name, score, extraData, callback) {
             try {
                 const lb = await this.getLeaderboardsInstance();
-                await lb.setLeaderboardScore(name, score, extraData || undefined);
+                const fn = lb.setScore || lb.setLeaderboardScore;
+                if (!fn) throw new Error("Leaderboard setScore method not found");
+                await fn.call(lb, name, score, extraData || undefined);
                 callback(JSON.stringify({ success: true }));
             } catch (err) {
                 callback(JSON.stringify({ success: false, error: err.message || String(err) }));
@@ -412,7 +467,9 @@
         async getLeaderboardPlayerEntry(name, callback) {
             try {
                 const lb = await this.getLeaderboardsInstance();
-                const entry = await lb.getLeaderboardPlayerEntry(name);
+                const fn = lb.getPlayerEntry || lb.getLeaderboardPlayerEntry;
+                if (!fn) throw new Error("Leaderboard getPlayerEntry method not found");
+                const entry = await fn.call(lb, name);
                 callback(JSON.stringify({ success: true, data: entry }));
             } catch (err) {
                 callback(JSON.stringify({ success: false, error: err.message || String(err) }));
@@ -423,7 +480,9 @@
             try {
                 const lb = await this.getLeaderboardsInstance();
                 const options = optionsJson ? JSON.parse(optionsJson) : {};
-                const entries = await lb.getLeaderboardEntries(name, options);
+                const fn = lb.getEntries || lb.getLeaderboardEntries;
+                if (!fn) throw new Error("Leaderboard getEntries method not found");
+                const entries = await fn.call(lb, name, options);
                 callback(JSON.stringify({ success: true, data: entries }));
             } catch (err) {
                 callback(JSON.stringify({ success: false, error: err.message || String(err) }));
@@ -475,8 +534,20 @@
             try {
                 if (!this.payments) await this.initPayments(null, () => {});
                 if (!this.payments) throw new Error("Payments not initialized");
-                const catalog = await this.payments.getCatalog();
-                callback(JSON.stringify({ success: true, data: catalog || [] }));
+                const rawCatalog = await this.payments.getCatalog();
+                const catalog = (rawCatalog || []).map(p => ({
+                    id: p.id || '',
+                    title: p.title || '',
+                    description: p.description || '',
+                    imageURI: p.imageURI || '',
+                    price: p.price || '',
+                    priceValue: p.priceValue || '',
+                    priceCurrencyCode: p.priceCurrencyCode || '',
+                    currencyImageSmall: typeof p.getPriceCurrencyImage === 'function' ? p.getPriceCurrencyImage('small') : '',
+                    currencyImageMedium: typeof p.getPriceCurrencyImage === 'function' ? p.getPriceCurrencyImage('medium') : '',
+                    currencyImageSvg: typeof p.getPriceCurrencyImage === 'function' ? p.getPriceCurrencyImage('svg') : ''
+                }));
+                callback(JSON.stringify({ success: true, data: catalog }));
             } catch (err) {
                 callback(JSON.stringify({ success: false, error: err.message || String(err) }));
             }
@@ -566,11 +637,21 @@
         async getAllGames(callback) {
             try {
                 if (!this.ysdk || !this.ysdk.features || !this.ysdk.features.GamesAPI || !this.ysdk.features.GamesAPI.getAllGames) {
-                    callback(JSON.stringify({ success: true, data: [] }));
+                    callback(JSON.stringify({ success: true, data: { developerURL: '', games: [] } }));
                     return;
                 }
-                const games = await this.ysdk.features.GamesAPI.getAllGames();
-                callback(JSON.stringify({ success: true, data: games || [] }));
+                const result = await this.ysdk.features.GamesAPI.getAllGames();
+                let devUrl = '';
+                let gamesList = [];
+                if (result && typeof result === 'object') {
+                    if (Array.isArray(result)) {
+                        gamesList = result;
+                    } else {
+                        devUrl = result.developerURL || '';
+                        gamesList = result.games || [];
+                    }
+                }
+                callback(JSON.stringify({ success: true, data: { developerURL: devUrl, games: gamesList } }));
             } catch (err) {
                 callback(JSON.stringify({ success: false, error: err.message || String(err) }));
             }
@@ -582,7 +663,8 @@
                     callback(JSON.stringify({ success: false, error: 'GamesAPI not available' }));
                     return;
                 }
-                const game = await this.ysdk.features.GamesAPI.getGameByID(appId);
+                const idVal = !isNaN(Number(appId)) ? Number(appId) : appId;
+                const game = await this.ysdk.features.GamesAPI.getGameByID(idVal);
                 callback(JSON.stringify({ success: true, data: game }));
             } catch (err) {
                 callback(JSON.stringify({ success: false, error: err.message || String(err) }));
@@ -681,6 +763,34 @@
                 }
                 const meta = JSON.parse(metaJson);
                 await this.ysdk.multiplayer.sessions.push(meta);
+                callback(JSON.stringify({ success: true }));
+            } catch (err) {
+                callback(JSON.stringify({ success: false, error: err.message || String(err) }));
+            }
+        },
+
+        // --- SDK Events ---
+        async dispatchEvent(eventName, detailJson, callback) {
+            try {
+                if (!this.ysdk || !this.ysdk.dispatchEvent) {
+                    callback(JSON.stringify({ success: false, error: 'dispatchEvent not supported' }));
+                    return;
+                }
+                const detail = detailJson ? JSON.parse(detailJson) : undefined;
+                await this.ysdk.dispatchEvent(eventName, detail);
+                callback(JSON.stringify({ success: true }));
+            } catch (err) {
+                callback(JSON.stringify({ success: false, error: err.message || String(err) }));
+            }
+        },
+
+        async dispatchExit(callback) {
+            try {
+                if (!this.ysdk || !this.ysdk.dispatchEvent || !this.ysdk.EVENTS) {
+                    callback(JSON.stringify({ success: false, error: 'EXIT event not supported' }));
+                    return;
+                }
+                await this.ysdk.dispatchEvent(this.ysdk.EVENTS.EXIT);
                 callback(JSON.stringify({ success: true }));
             } catch (err) {
                 callback(JSON.stringify({ success: false, error: err.message || String(err) }));

@@ -45,7 +45,7 @@ func init(options: Dictionary = {}) -> Dictionary:
 func open_auth_dialog() -> Dictionary:
 	var res: Dictionary
 	if _core.is_web():
-		res = await _core.call_js_async("openAuthDialog")
+		res = await _core.call_js_async("openAuthDialog", [], 300.0)
 	else:
 		res = await _core.mock_bridge.open_auth_dialog()
 	
@@ -78,6 +78,91 @@ func get_photo(size: String = "medium") -> String:
 			return str(_info.get("photoLarge", ""))
 		_:
 			return str(_info.get("photoMedium", ""))
+
+var _avatar_cache: Dictionary = {}
+
+## Loads the player's avatar photo as a Texture2D asynchronously.
+## If offline or in editor mock mode, generates a procedural circular avatar.
+func get_avatar_texture(size: String = "medium") -> Texture2D:
+	var url: String = get_photo(size)
+	return await load_texture_from_url(url, get_name())
+
+## Loads an image texture from an HTTP/HTTPS URL with caching and procedural fallback.
+func load_texture_from_url(url: String, fallback_text: String = "P") -> Texture2D:
+	if url.is_empty():
+		return _generate_procedural_avatar(fallback_text)
+	
+	if _avatar_cache.has(url):
+		return _avatar_cache[url]
+	
+	# In mock mode or offline, use procedural avatar generator
+	if not _core.is_web() and (url.begins_with("mock://") or "yandex.net/get-yapic/0/0-0" in url or not url.begins_with("http")):
+		var mock_tex := _generate_procedural_avatar(fallback_text)
+		_avatar_cache[url] = mock_tex
+		return mock_tex
+
+	var tree: SceneTree = Engine.get_main_loop() as SceneTree
+	if not tree or not tree.root:
+		return _generate_procedural_avatar(fallback_text)
+
+	var http: HTTPRequest = HTTPRequest.new()
+	tree.root.add_child(http)
+	
+	var err := http.request(url)
+	if err != OK:
+		http.queue_free()
+		return _generate_procedural_avatar(fallback_text)
+	
+	var result: Array = await http.request_completed
+	http.queue_free()
+	
+	var response_code: int = result[1]
+	var body: PackedByteArray = result[3]
+	
+	if response_code == 200 and not body.is_empty():
+		var image: Image = Image.new()
+		var img_err := image.load_png_from_buffer(body)
+		if img_err != OK:
+			img_err = image.load_jpg_from_buffer(body)
+		if img_err != OK:
+			img_err = image.load_webp_from_buffer(body)
+		
+		if img_err == OK:
+			var tex: ImageTexture = ImageTexture.create_from_image(image)
+			_avatar_cache[url] = tex
+			return tex
+	
+	var fallback := _generate_procedural_avatar(fallback_text)
+	_avatar_cache[url] = fallback
+	return fallback
+
+func _generate_procedural_avatar(label: String = "P") -> Texture2D:
+	var width := 128
+	var height := 128
+	var img := Image.create(width, height, false, Image.FORMAT_RGBA8)
+	
+	var hash_val := absi(label.hash())
+	var hue := fmod(float(hash_val % 360) / 360.0, 1.0)
+	var bg_color := Color.from_hsv(hue, 0.65, 0.75, 1.0)
+	var center := Vector2(width / 2.0, height / 2.0)
+	var radius := float(width / 2.0 - 2.0)
+	
+	for y in range(height):
+		for x in range(width):
+			var dist := Vector2(x, y).distance_to(center)
+			if dist <= radius:
+				var head_center := Vector2(center.x, center.y - 12.0)
+				var head_radius := 24.0
+				var body_center := Vector2(center.x, center.y + 44.0)
+				var body_radius := 40.0
+				if Vector2(x, y).distance_to(head_center) <= head_radius or Vector2(x, y).distance_to(body_center) <= body_radius:
+					img.set_pixel(x, y, Color.WHITE)
+				else:
+					img.set_pixel(x, y, bg_color)
+			else:
+				img.set_pixel(x, y, Color(0, 0, 0, 0))
+	
+	return ImageTexture.create_from_image(img)
 
 ## Returns player paying status ("paying" or "").
 func get_paying_status() -> String:

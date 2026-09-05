@@ -37,6 +37,39 @@ func set_score(leaderboard_name: String, score: int, extra_data: String = "") ->
 		score_failed.emit(leaderboard_name, str(res.get("error", "Failed to set score")))
 	return ok
 
+var _pending_scores: Dictionary = {}
+var _debounce_seq: int = 0
+
+## Sets player score with a debounce delay (default 1.0s) to comply with Yandex 1 req/sec rate limit.
+## If called multiple times within delay_sec, only the highest score is submitted once the timer expires.
+func set_score_debounced(leaderboard_name: String, score: int, extra_data: String = "", delay_sec: float = 1.0) -> void:
+	_debounce_seq += 1
+	var current_seq: int = _debounce_seq
+	
+	if _pending_scores.has(leaderboard_name):
+		var prev: Dictionary = _pending_scores[leaderboard_name]
+		if score > int(prev.get("score", 0)):
+			prev["score"] = score
+			prev["extra_data"] = extra_data
+		prev["seq"] = current_seq
+	else:
+		_pending_scores[leaderboard_name] = {
+			"score": score,
+			"extra_data": extra_data,
+			"seq": current_seq
+		}
+	
+	var tree: SceneTree = Engine.get_main_loop() as SceneTree
+	if tree:
+		await tree.create_timer(delay_sec).timeout
+	
+	if _pending_scores.has(leaderboard_name):
+		var data: Dictionary = _pending_scores[leaderboard_name]
+		if int(data.get("seq", -1)) == current_seq:
+			_pending_scores.erase(leaderboard_name)
+			set_score(leaderboard_name, int(data.get("score", 0)), str(data.get("extra_data", "")))
+
+
 ## Retrieves the current player's entry and rank in the given leaderboard.
 func get_player_entry(leaderboard_name: String) -> Dictionary:
 	var res: Dictionary
@@ -62,3 +95,9 @@ func get_entries(leaderboard_name: String, options: Dictionary = {}) -> Dictiona
 		entries.append(entry)
 	entries_loaded.emit(leaderboard_name, entries)
 	return data
+
+## Loads an avatar texture for a leaderboard entry using the player's shared cache and offline generator.
+func load_avatar_texture(avatar_url: String, fallback_name: String = "Player") -> Texture2D:
+	if _core and _core.player:
+		return await _core.player.load_texture_from_url(avatar_url, fallback_name)
+	return null

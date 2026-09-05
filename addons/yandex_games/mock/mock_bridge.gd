@@ -25,7 +25,10 @@ var _mock_catalog: Array[Dictionary] = [
 		"imageURI": "",
 		"price": "50 YAN",
 		"priceValue": "50",
-		"priceCurrencyCode": "YAN"
+		"priceCurrencyCode": "YAN",
+		"currencyImageSmall": "https://yastatic.net/s3/doc-binary/src/dev/games/ru/index/yan.svg",
+		"currencyImageMedium": "https://yastatic.net/s3/doc-binary/src/dev/games/ru/index/yan.svg",
+		"currencyImageSvg": "https://yastatic.net/s3/doc-binary/src/dev/games/ru/index/yan.svg"
 	},
 	{
 		"id": "no_ads",
@@ -34,15 +37,35 @@ var _mock_catalog: Array[Dictionary] = [
 		"imageURI": "",
 		"price": "100 YAN",
 		"priceValue": "100",
-		"priceCurrencyCode": "YAN"
+		"priceCurrencyCode": "YAN",
+		"currencyImageSmall": "https://yastatic.net/s3/doc-binary/src/dev/games/ru/index/yan.svg",
+		"currencyImageMedium": "https://yastatic.net/s3/doc-binary/src/dev/games/ru/index/yan.svg",
+		"currencyImageSvg": "https://yastatic.net/s3/doc-binary/src/dev/games/ru/index/yan.svg"
 	}
 ]
 var _banner_showing: bool = false
 var _reviewed: bool = false
 var _shortcut_installed: bool = false
+var is_signed: bool = false
 
 func _init() -> void:
+	player_name = str(ProjectSettings.get_setting("yandex_games/mock/player_name", player_name))
+	player_unique_id = str(ProjectSettings.get_setting("yandex_games/mock/player_unique_id", player_unique_id))
+	is_player_authorized = bool(ProjectSettings.get_setting("yandex_games/mock/is_authorized", is_player_authorized))
 	_load_mock_file()
+
+func reset_mock_storage() -> void:
+	_mock_data.clear()
+	_mock_stats.clear()
+	_mock_leaderboards.clear()
+	_mock_purchases.clear()
+	_reviewed = false
+	_shortcut_installed = false
+	if FileAccess.file_exists(MOCK_SAVE_PATH):
+		var dir := DirAccess.open("user://")
+		if dir:
+			dir.remove("yandex_mock_data.json")
+	_log("Mock storage reset.")
 
 func _log(msg: String) -> void:
 	print_rich("[color=cyan][YandexGames Mock][/color] %s" % msg)
@@ -76,8 +99,9 @@ func _save_mock_file() -> void:
 
 # --- Core Lifecycle ---
 
-func init(options: Dictionary) -> Dictionary:
-	_log("SDK Initialized in Mock Mode (options: %s)" % str(options))
+func init(options: Dictionary = {}) -> Dictionary:
+	is_signed = bool(options.get("signed", false))
+	_log("SDK Initialized in Mock Mode (signed: %s, options: %s)" % [str(is_signed), str(options)])
 	is_initialized = true
 	return {
 		"success": true,
@@ -111,7 +135,13 @@ func get_environment() -> Dictionary:
 		"browser": { "lang": "ru" },
 		"i18n": { "lang": "ru", "tld": "ru" },
 		"payload": "",
-		"fullscreen": false
+		"fullscreen": false,
+		"referrer": {
+			"type": "promo",
+			"promoId": "mock_promo_2026",
+			"intent": "open_shop",
+			"inappId": "coins_100"
+		}
 	}
 
 func get_device_info() -> Dictionary:
@@ -125,7 +155,7 @@ func get_device_info() -> Dictionary:
 		"isTV": false
 	}
 
-# --- Fullscreen ---
+# --- Fullscreen & Orientation ---
 
 func fullscreen_status() -> bool:
 	return DisplayServer.window_get_mode() == DisplayServer.WINDOW_MODE_FULLSCREEN
@@ -137,6 +167,15 @@ func fullscreen_request() -> Dictionary:
 func fullscreen_exit() -> Dictionary:
 	_log("Fullscreen exit.")
 	return { "success": true, "status": "off" }
+
+func screen_orientation_get() -> String:
+	var vp_size: Vector2 = DisplayServer.window_get_size()
+	return "landscape" if vp_size.x >= vp_size.y else "portrait"
+
+func screen_orientation_set(val: String) -> Dictionary:
+	_log("Screen orientation set: %s" % val)
+	return { "success": true, "orientation": val }
+
 
 # --- Ads ---
 
@@ -181,8 +220,9 @@ func hide_banner_adv() -> Dictionary:
 
 # --- Player & Auth ---
 
-func init_player(_options: Dictionary = {}) -> Dictionary:
-	_log("Player initialized (Authorized: %s, Name: %s)" % [str(is_player_authorized), player_name])
+func init_player(options: Dictionary = {}) -> Dictionary:
+	var signed_req: bool = is_signed or bool(options.get("signed", false))
+	_log("Player initialized (Authorized: %s, Name: %s, Signed: %s)" % [str(is_player_authorized), player_name, str(signed_req)])
 	return {
 		"success": true,
 		"data": {
@@ -192,7 +232,8 @@ func init_player(_options: Dictionary = {}) -> Dictionary:
 			"photoSmall": player_photo_url if is_player_authorized else "",
 			"photoMedium": player_photo_url if is_player_authorized else "",
 			"photoLarge": player_photo_url if is_player_authorized else "",
-			"payingStatus": "paying" if is_player_authorized else ""
+			"payingStatus": "paying" if is_player_authorized else "",
+			"signature": "mock_player_jwt_signature_eyJhbGciOi..." if signed_req else ""
 		}
 	}
 
@@ -370,9 +411,11 @@ func purchase(options: Dictionary) -> Dictionary:
 		"purchaseToken": token,
 		"developerPayload": options.get("developerPayload", "")
 	}
+	if is_signed:
+		purchase_entry["signature"] = "mock_purchase_jwt_signature_eyJhbGciOi..."
 	_mock_purchases.append(purchase_entry)
 	_save_mock_file()
-	_log("Purchase completed for '%s' (token: %s)" % [product_id, token])
+	_log("Purchase completed for '%s' (token: %s, signed: %s)" % [product_id, token, str(is_signed)])
 	return { "success": true, "data": purchase_entry }
 
 func consume_purchase(token: String) -> Dictionary:
@@ -430,17 +473,20 @@ func get_flags(params: Dictionary = {}) -> Dictionary:
 
 # --- Cross-Promotion / Games ---
 
-func get_all_games() -> Array[Dictionary]:
+func get_all_games() -> Dictionary:
 	var list: Array[Dictionary] = [
 		{ "appID": "mock_game_1", "title": "Example Game 1", "url": "https://yandex.ru/games" },
 		{ "appID": "mock_game_2", "title": "Example Game 2", "url": "https://yandex.ru/games" }
 	]
-	return list
+	return {
+		"developerURL": "https://yandex.ru/games/developer?name=mock",
+		"games": list
+	}
 
-func get_game_by_id(app_id: String) -> Dictionary:
+func get_game_by_id(app_id: Variant) -> Dictionary:
 	return {
 		"success": true,
-		"data": { "appID": app_id, "title": "Example Game", "url": "https://yandex.ru/games" }
+		"data": { "appID": str(app_id), "title": "Example Game", "url": "https://yandex.ru/games" }
 	}
 
 # --- Clipboard ---
@@ -473,5 +519,15 @@ func multiplayer_commit(payload: Dictionary) -> void:
 
 func multiplayer_push(meta: Dictionary) -> Dictionary:
 	_log("Multiplayer session pushed to server (meta: %s)" % str(meta))
+	return { "success": true }
+
+# --- SDK Events ---
+
+func dispatch_event(event_name: String, detail: Dictionary = {}) -> Dictionary:
+	_log("dispatchEvent('%s', %s)" % [event_name, str(detail)])
+	return { "success": true }
+
+func exit() -> Dictionary:
+	_log("exit() event dispatched (EXIT).")
 	return { "success": true }
 

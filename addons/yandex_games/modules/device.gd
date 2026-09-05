@@ -76,3 +76,22 @@ func exit_fullscreen() -> bool:
 	if ok:
 		fullscreen_changed.emit(false)
 	return ok
+
+## Returns current screen orientation ("portrait" or "landscape").
+func get_orientation() -> String:
+	if _core.is_web():
+		var bridge: JavaScriptObject = JavaScriptBridge.get_interface("GodotYandexBridge")
+		if bridge:
+			return str(bridge.screenOrientationGet())
+		return "landscape"
+	else:
+		return _core.mock_bridge.screen_orientation_get()
+
+## Requests setting screen orientation ("portrait" or "landscape").
+func set_orientation(orientation: String) -> bool:
+	if _core.is_web():
+		var res: Dictionary = await _core.call_js_async("screenOrientationSet", [orientation])
+		return res.get("success", false)
+	else:
+		return _core.mock_bridge.screen_orientation_set(orientation).get("success", false)
+
