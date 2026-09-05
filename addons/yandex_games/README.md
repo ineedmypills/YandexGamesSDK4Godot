@@ -658,7 +658,7 @@ You can test a draft game directly from any local HTTP server (such as Godot's b
    ```
 
 > [!NOTE]
-> **CDN Fallback**: If you open `http://localhost:8060` directly in a browser without the proxy or iframe wrapper, the relative script `<script src="/sdk.js">` would normally fail because standard servers don't host `sdk.js`. This plugin's template includes an automatic fallback (`onerror`) to `https://sdk.games.s3.yandex.net/sdk.js` and prints clear diagnostic warnings in the browser console.
+> **Strict Platform Compliance**: In accordance with Yandex Games moderation requirements, the SDK script is loaded exclusively via `<script src="/sdk.js"></script>` without direct links to S3 service storage (`s3.yandex.net`). For local browser testing outside of Yandex, use the built-in Dev Proxy (`npx @yandex-games/sdk-dev-proxy`) or Editor Mock Mode.
 
 ### Option 3: Editor Quick Tools
 

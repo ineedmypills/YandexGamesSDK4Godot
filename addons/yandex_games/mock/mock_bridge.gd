@@ -11,7 +11,7 @@ var is_initialized: bool = false
 var is_player_authorized: bool = true
 var player_unique_id: String = "mock_player_12345"
 var player_name: String = "Test Player (Editor)"
-var player_photo_url: String = "https://avatars.mds.yandex.net/get-yapic/0/0-0/islands-200"
+var player_photo_url: String = "mock://avatar/islands-200"
 
 var _mock_data: Dictionary = {}
 var _mock_stats: Dictionary = {}
