@@ -115,6 +115,7 @@
                             if (this.pauseResumeCallback) this.pauseResumeCallback(JSON.stringify({ event: 'pause' }));
                         });
                         this.ysdk.on('game_api_resume', () => {
+                            this.refocusCanvas();
                             if (this.pauseResumeCallback) this.pauseResumeCallback(JSON.stringify({ event: 'resume' }));
                         });
 
@@ -291,6 +292,16 @@
                 }
             },
 
+            refocusCanvas() {
+                try {
+                    window.focus();
+                    const canvas = document.getElementById('canvas') || document.querySelector('canvas');
+                    if (canvas && typeof canvas.focus === 'function') {
+                        canvas.focus();
+                    }
+                } catch (e) {}
+            },
+
             showFullscreenAdv(callback) {
                 if (!this.ysdk || !this.ysdk.adv) {
                     callback(JSON.stringify({ event: 'error', error: 'SDK not ready' }));
@@ -299,9 +310,19 @@
                 this.ysdk.adv.showFullscreenAdv({
                     callbacks: {
                         onOpen: () => callback(JSON.stringify({ event: 'open' })),
-                        onClose: (wasShown) => callback(JSON.stringify({ event: 'close', wasShown: !!wasShown })),
-                        onError: (err) => callback(JSON.stringify({ event: 'error', error: err ? (err.message || String(err)) : 'Error' })),
-                        onOffline: () => callback(JSON.stringify({ event: 'offline' }))
+                        onClose: (wasShown) => {
+                            this.refocusCanvas();
+                            setTimeout(() => this.refocusCanvas(), 100);
+                            callback(JSON.stringify({ event: 'close', wasShown: !!wasShown }));
+                        },
+                        onError: (err) => {
+                            this.refocusCanvas();
+                            callback(JSON.stringify({ event: 'error', error: err ? (err.message || String(err)) : 'Error' }));
+                        },
+                        onOffline: () => {
+                            this.refocusCanvas();
+                            callback(JSON.stringify({ event: 'offline' }));
+                        }
                     }
                 });
             },
@@ -315,8 +336,15 @@
                     callbacks: {
                         onOpen: () => callback(JSON.stringify({ event: 'open' })),
                         onRewarded: () => callback(JSON.stringify({ event: 'rewarded' })),
-                        onClose: (wasShown) => callback(JSON.stringify({ event: 'close', wasShown: !!wasShown })),
-                        onError: (err) => callback(JSON.stringify({ event: 'error', error: err ? (err.message || String(err)) : 'Error' }))
+                        onClose: (wasShown) => {
+                            this.refocusCanvas();
+                            setTimeout(() => this.refocusCanvas(), 100);
+                            callback(JSON.stringify({ event: 'close', wasShown: !!wasShown }));
+                        },
+                        onError: (err) => {
+                            this.refocusCanvas();
+                            callback(JSON.stringify({ event: 'error', error: err ? (err.message || String(err)) : 'Error' }));
+                        }
                     }
                 });
             },

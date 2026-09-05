@@ -37,6 +37,7 @@
                         }
                     });
                     this.ysdk.on('game_api_resume', () => {
+                        this.refocusCanvas();
                         if (this.pauseResumeCallback) {
                             this.pauseResumeCallback(JSON.stringify({ event: 'resume' }));
                         }
@@ -225,6 +226,16 @@
             }
         },
 
+        refocusCanvas() {
+            try {
+                window.focus();
+                const canvas = document.getElementById('canvas') || document.querySelector('canvas');
+                if (canvas && typeof canvas.focus === 'function') {
+                    canvas.focus();
+                }
+            } catch (e) {}
+        },
+
         // --- Advertisement ---
         showFullscreenAdv(callback) {
             if (!this.ysdk || !this.ysdk.adv) {
@@ -238,12 +249,16 @@
                         callback(JSON.stringify({ event: 'open' }));
                     },
                     onClose: (wasShown) => {
+                        this.refocusCanvas();
+                        setTimeout(() => this.refocusCanvas(), 100);
                         callback(JSON.stringify({ event: 'close', wasShown: !!wasShown }));
                     },
                     onError: (err) => {
+                        this.refocusCanvas();
                         callback(JSON.stringify({ event: 'error', error: err ? (err.message || String(err)) : 'Unknown ad error' }));
                     },
                     onOffline: () => {
+                        this.refocusCanvas();
                         callback(JSON.stringify({ event: 'offline' }));
                     }
                 }
@@ -265,9 +280,12 @@
                         callback(JSON.stringify({ event: 'rewarded' }));
                     },
                     onClose: (wasShown) => {
+                        this.refocusCanvas();
+                        setTimeout(() => this.refocusCanvas(), 100);
                         callback(JSON.stringify({ event: 'close', wasShown: !!wasShown }));
                     },
                     onError: (err) => {
+                        this.refocusCanvas();
                         callback(JSON.stringify({ event: 'error', error: err ? (err.message || String(err)) : 'Unknown rewarded ad error' }));
                     }
                 }

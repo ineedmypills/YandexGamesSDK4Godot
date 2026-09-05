@@ -52,11 +52,16 @@ var _js_bridge: JavaScriptObject = null
 var _js_pause_resume_cb: JavaScriptObject = null
 var _ad_event_queue: Array[Dictionary] = []
 var _is_initializing: bool = false
-var _pause_sources: int = 0
+var _ad_playing: bool = false
+var _platform_paused: bool = false
 var _audio_muted_by_platform: bool = false
 var _user_was_muted_before: bool = false
 
+func _init() -> void:
+	process_mode = Node.PROCESS_MODE_ALWAYS
+
 func _ready() -> void:
+	process_mode = Node.PROCESS_MODE_ALWAYS
 	_load_project_settings()
 
 	# Instantiate modules
@@ -139,10 +144,13 @@ func _on_js_pause_resume(args: Array) -> void:
 		elif ev == "account_selection_closed":
 			account_selection_closed.emit()
 
-func _request_pause() -> void:
-	_pause_sources += 1
-	if _pause_sources == 1:
-		is_platform_paused = true
+func _sync_pause_state() -> void:
+	var should_pause: bool = _ad_playing or _platform_paused
+	if should_pause == is_platform_paused:
+		return
+	
+	is_platform_paused = should_pause
+	if is_platform_paused:
 		if auto_mute_audio:
 			_user_was_muted_before = AudioServer.is_bus_mute(0)
 			if not _user_was_muted_before:
@@ -151,11 +159,7 @@ func _request_pause() -> void:
 		if auto_pause_tree:
 			get_tree().paused = true
 		game_paused.emit()
-
-func _release_pause() -> void:
-	_pause_sources = max(0, _pause_sources - 1)
-	if _pause_sources == 0:
-		is_platform_paused = false
+	else:
 		if auto_mute_audio and _audio_muted_by_platform:
 			if not _user_was_muted_before:
 				AudioServer.set_bus_mute(0, false)
@@ -165,16 +169,26 @@ func _release_pause() -> void:
 		game_resumed.emit()
 
 func _on_platform_pause() -> void:
-	_request_pause()
+	_platform_paused = true
+	_sync_pause_state()
 
 func _on_platform_resume() -> void:
-	_release_pause()
+	_platform_paused = false
+	_sync_pause_state()
 
 func _on_ad_start() -> void:
-	_request_pause()
+	_ad_playing = true
+	_sync_pause_state()
 
 func _on_ad_end() -> void:
-	_release_pause()
+	_ad_playing = false
+	if is_web():
+		var is_hidden: bool = bool(JavaScriptBridge.eval("Boolean(document.hidden)"))
+		if not is_hidden:
+			_platform_paused = false
+	else:
+		_platform_paused = false
+	_sync_pause_state()
 
 ## Ensures that SDK is initialized, awaiting completion if already in progress.
 func ensure_initialized() -> bool:
@@ -344,23 +358,21 @@ func call_js_async(method_name: String, args: Array = [], timeout_sec: float = 6
 	
 	bridge.callv(method_name, Array(call_args))
 	
-	var elapsed: float = 0.0
+	var start_time: int = Time.get_ticks_msec()
 	while not result_holder.completed:
 		await get_tree().process_frame
 		if timeout_sec > 0.0:
-			elapsed += get_process_delta_time()
-			if elapsed >= timeout_sec:
+			if (Time.get_ticks_msec() - start_time) >= int(timeout_sec * 1000.0):
 				return { "success": false, "error": "Timeout waiting for JS method: %s" % method_name }
 	
 	return result_holder.data
 
 func _wait_for_next_ad_event(timeout_sec: float = 75.0) -> Dictionary:
-	var elapsed: float = 0.0
+	var start_time: int = Time.get_ticks_msec()
 	while _ad_event_queue.is_empty():
 		await get_tree().process_frame
 		if timeout_sec > 0.0:
-			elapsed += get_process_delta_time()
-			if elapsed >= timeout_sec:
+			if (Time.get_ticks_msec() - start_time) >= int(timeout_sec * 1000.0):
 				return { "event": "error", "error": "Timeout waiting for ad event" }
 	return _ad_event_queue.pop_front()
 

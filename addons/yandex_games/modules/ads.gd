@@ -74,7 +74,6 @@ func show_interstitial() -> Dictionary:
 				interstitial_opened.emit()
 			elif is_close.call(ev):
 				var was_shown: bool = data.get("wasShown", false)
-				interstitial_closed.emit(was_shown)
 				result.success = true
 				result.was_shown = was_shown
 				is_finished = true
@@ -93,27 +92,30 @@ func show_interstitial() -> Dictionary:
 			cb_data = await _core._wait_for_next_ad_event(60.0)
 			event = str(cb_data.get("event", "")).to_lower()
 			handle_event.call(event, cb_data)
+		
+		_core._on_ad_end()
+		if result.success:
+			interstitial_closed.emit(result.was_shown)
 	else:
 		# Mock mode
-		var ad_events: Array[Dictionary] = []
+		var was_shown_mock: bool = true
 		var mock_cb: Callable = func(payload: Dictionary) -> void:
-			ad_events.append(payload)
 			var ev: String = str(payload.get("event", "")).to_lower()
 			if ev in ["open", "onopen"]:
 				interstitial_opened.emit()
 			elif ev in ["close", "onclose"]:
-				var was_shown: bool = payload.get("wasShown", true)
-				interstitial_closed.emit(was_shown)
+				was_shown_mock = payload.get("wasShown", true)
 		
 		await _core.mock_bridge.show_fullscreen_adv(mock_cb)
+		_core._on_ad_end()
 		result.success = true
-		result.was_shown = true
+		result.was_shown = was_shown_mock
+		interstitial_closed.emit(was_shown_mock)
 	
 	if result.was_shown:
 		_last_interstitial_time = Time.get_ticks_msec() / 1000.0
 		_schedule_cooldown_timer()
 
-	_core._on_ad_end()
 	return result
 
 func _schedule_cooldown_timer() -> void:
@@ -168,13 +170,14 @@ func show_rewarded() -> Dictionary:
 			handle_event.call(event, cb_data)
 
 		# Обработка опоздавших событий rewarded (race condition в SDK Яндекса)
-		await _core.get_tree().process_frame
 		while not _core._ad_event_queue.is_empty():
 			var late: Dictionary = _core._ad_event_queue.pop_front()
 			var late_event: String = str(late.get("event", "")).to_lower()
 			if is_reward.call(late_event) and not got_reward:
 				got_reward = true
 				rewarded_rewarded.emit()
+
+		_core._on_ad_end()
 
 		# Корректное выставление результата и отправка сигнала закрытия
 		if result.error.is_empty():
@@ -186,7 +189,7 @@ func show_rewarded() -> Dictionary:
 			result.success = false
 	else:
 		# Mock mode
-		var state: Dictionary = { "got_reward": false }
+		var state: Dictionary = { "got_reward": false, "was_shown": false }
 		var mock_cb: Callable = func(payload: Dictionary) -> void:
 			var ev: String = str(payload.get("event", "")).to_lower()
 			if ev in ["open", "onopen"]:
@@ -195,15 +198,15 @@ func show_rewarded() -> Dictionary:
 				state.got_reward = true
 				rewarded_rewarded.emit()
 			elif ev in ["close", "onclose"]:
-				var was_shown: bool = payload.get("wasShown", true)
-				rewarded_closed.emit(was_shown)
+				state.was_shown = payload.get("wasShown", true)
 		
 		await _core.mock_bridge.show_rewarded_video(mock_cb)
+		_core._on_ad_end()
 		result.success = true
 		result.rewarded = state.got_reward
-		result.was_shown = true
+		result.was_shown = state.was_shown
+		rewarded_closed.emit(state.was_shown)
 	
-	_core._on_ad_end()
 	return result
 
 ## Fetches the current sticky banner status.
