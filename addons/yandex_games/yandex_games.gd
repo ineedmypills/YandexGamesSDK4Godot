@@ -1,4 +1,5 @@
 @tool
+class_name YandexGamesNode
 extends Node
 
 ## Yandex Games SDK Singleton for Godot 4.x
